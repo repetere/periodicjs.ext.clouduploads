@@ -1,0 +1,7 @@
+{
+	"development":{
+    "provider": "rackspace",
+    "username": "your-user-name",
+    "apiKey": "your-api-key"
+	}
+}
