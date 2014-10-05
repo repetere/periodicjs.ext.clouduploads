@@ -1,5 +1,4 @@
 {
-	"name": "periodicjs.ext.cloudfiles",
 	"periodicCompatibility":"1.8.0",
 	"periodicDependencies": [],
 	"periodicjs.ext.admin": {
