@@ -14,7 +14,9 @@ var path = require('path'),
 	packagejsonFileJSON = fs.readJSONSync(path.resolve('./package.json')),
 	extname = packagejsonFileJSON.name,
 	extdir = path.resolve( './public'),
+	configdir = path.resolve( './config'),
 	extpublicdir = path.resolve(__dirname,'../../public/extensions/', extname),
+	extconfigdir = path.resolve(__dirname,'../../content/config/extensions/', extname),
 	extpackfile = path.resolve('./package.json'),
 	extconffile = path.resolve('./periodicjs.ext.json');
 
@@ -25,8 +27,10 @@ ExtensionCore.install({
 		enabled:false,
 		extname:extname,
 		extdir:extdir,
+		configdir:configdir,
 		skipconffile:skipconffile,
 		extpublicdir:extpublicdir,
+		extconfigdir:extconfigdir,
 		extpackfile:extpackfile,
 		extconffile:extconffile
 	},
