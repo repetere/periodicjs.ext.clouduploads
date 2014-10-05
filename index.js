@@ -12,6 +12,7 @@ module.exports = function (periodic) {
 	 * admin/media manager routes
 	 */
 	mediaRouter.post('/new', clouduploadController.upload, mediaassetController.createassetfile);
+	mediaRouter.post('/:id/delete', mediaassetController.loadAsset, clouduploadController.remove);
 
 	periodic.app.use('/mediaasset', mediaRouter);
 };

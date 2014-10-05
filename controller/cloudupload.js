@@ -68,7 +68,10 @@ var upload = function (req, res, next) {
 			cloudstorageclient.upload({
 				container: cloudStorageContainer,
 				remote: newfilepath,
-				local: returnFile.path
+				local: returnFile.path,
+				headers: { // optionally provide raw headers to send to cloud files
+					'Cache-Control': 'max-age=86400'
+				}
 			}, function (err, result) {
 				//remove temp file
 				fs.remove(returnFile.path, function (err) {
@@ -89,17 +92,17 @@ var upload = function (req, res, next) {
 					});
 				}
 				else if (result) {
-
 					returnFileObj.attributes = cloudStoragePublicPath;
 					returnFileObj.size = returnFile.size;
 					returnFileObj.filename = returnFile.name;
 					returnFileObj.assettype = returnFile.type;
-					returnFileObj.path = cloudStoragePublicPath.cdnUri + '/' + newfilepath;
+					returnFileObj.path = newfilepath;
 					returnFileObj.locationtype = cloudprovider.provider;
 					// returnFileObj.attributes.periodicDirectory = uploadDirectory;
 					// returnFileObj.attributes.periodicPath = path.join(cloudStoragePublicPath.cdnUri,newfilepath);
 					returnFileObj.fileurl = cloudStoragePublicPath.cdnUri + '/' + newfilepath;
 					returnFileObj.attributes.periodicFilename = newfilename;
+					returnFileObj.attributes.cloudfilepath = newfilepath;
 					// console.log('returnFileObj', returnFileObj);
 					req.controllerData.fileData = returnFileObj;
 					next();
@@ -108,6 +111,52 @@ var upload = function (req, res, next) {
 		});
 	}
 };
+
+var remove = function (req, res) {
+	var asset = req.controllerData.asset;
+	console.log('asset', asset);
+	if (asset.locationtype === 'rackspace') {
+		async.parallel({
+			deletefile: function (callback) {
+				cloudstorageclient.removeFile(asset.attributes.cloudfilepath, callback);
+			},
+			removeasset: function (callback) {
+				CoreController.deleteModel({
+					model: MediaAsset,
+					deleteid: asset._id,
+					req: req,
+					res: res,
+					callback: callback
+				});
+			}
+		}, function (err
+			//, results
+		) {
+			if (err) {
+				CoreController.handleDocumentQueryErrorResponse({
+					err: err,
+					res: res,
+					req: req
+				});
+			}
+			else {
+				CoreController.handleDocumentQueryRender({
+					req: req,
+					res: res,
+					redirecturl: '/p-admin/assets',
+					responseData: {
+						result: 'success',
+						data: asset
+					}
+				});
+			}
+		});
+	}
+};
+
+// var createStorageContainer = function () {
+
+// };
 
 var controller = function (resources) {
 	logger = resources.logger;
@@ -124,6 +173,7 @@ var controller = function (resources) {
 	// 
 	// cdn files: https://github.com/pkgcloud/pkgcloud/issues/324
 	// rackspace: https://gist.github.com/rdodev/129592b4addcebdf6ccd
+
 	fs.readJson(cloudproviderfilepath, function (err, data) {
 		if (err) {
 			cloudStorageClientError = err;
@@ -176,9 +226,9 @@ var controller = function (resources) {
 			}
 		}
 	});
-
 	return {
 		upload: upload,
+		remove: remove
 	};
 };
 
