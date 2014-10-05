@@ -103,6 +103,7 @@ var upload = function (req, res, next) {
 					returnFileObj.fileurl = cloudStoragePublicPath.cdnUri + '/' + newfilepath;
 					returnFileObj.attributes.periodicFilename = newfilename;
 					returnFileObj.attributes.cloudfilepath = newfilepath;
+					returnFileObj.attributes.cloudcontainername = cloudStorageContainer.name;
 					// console.log('returnFileObj', returnFileObj);
 					req.controllerData.fileData = returnFileObj;
 					next();
@@ -118,7 +119,7 @@ var remove = function (req, res) {
 	if (asset.locationtype === 'rackspace') {
 		async.parallel({
 			deletefile: function (callback) {
-				cloudstorageclient.removeFile(asset.attributes.cloudfilepath, callback);
+				cloudstorageclient.removeFile(asset.attributes.cloudcontainername, asset.attributes.cloudfilepath, callback);
 			},
 			removeasset: function (callback) {
 				CoreController.deleteModel({
@@ -154,26 +155,7 @@ var remove = function (req, res) {
 	}
 };
 
-// var createStorageContainer = function () {
-
-// };
-
-var controller = function (resources) {
-	logger = resources.logger;
-	mongoose = resources.mongoose;
-	appSettings = resources.settings;
-	CoreController = new ControllerHelper(resources);
-	CoreUtilities = new Utilities(resources);
-	CoreExtension = new Extensions(appSettings);
-	MediaAsset = mongoose.model('Asset');
-	cloudproviderfilepath = path.join(CoreExtension.getconfigdir({
-		extname: 'periodicjs.ext.clouduploads'
-	}), 'provider.json');
-	// Collection = mongoose.model('Collection');
-	// 
-	// cdn files: https://github.com/pkgcloud/pkgcloud/issues/324
-	// rackspace: https://gist.github.com/rdodev/129592b4addcebdf6ccd
-
+var createStorageContainer = function () {
 	fs.readJson(cloudproviderfilepath, function (err, data) {
 		if (err) {
 			cloudStorageClientError = err;
@@ -185,7 +167,7 @@ var controller = function (resources) {
 				cloudstorageclient = pkgcloud.storage.createClient(cloudprovider);
 
 				cloudstorageclient.createContainer({
-						name: 'periodic-uploads-env-' + appSettings.application.environment,
+						name: (cloudprovider.containername) ? cloudprovider.containername : 'periodicjs',
 						type: 'public',
 						metadata: {
 							env: appSettings.application.environment,
@@ -226,6 +208,25 @@ var controller = function (resources) {
 			}
 		}
 	});
+};
+
+var controller = function (resources) {
+	logger = resources.logger;
+	mongoose = resources.mongoose;
+	appSettings = resources.settings;
+	CoreController = new ControllerHelper(resources);
+	CoreUtilities = new Utilities(resources);
+	CoreExtension = new Extensions(appSettings);
+	MediaAsset = mongoose.model('Asset');
+	cloudproviderfilepath = path.join(CoreExtension.getconfigdir({
+		extname: 'periodicjs.ext.clouduploads'
+	}), 'provider.json');
+	// Collection = mongoose.model('Collection');
+	// 
+	// cdn files: https://github.com/pkgcloud/pkgcloud/issues/324
+	// rackspace: https://gist.github.com/rdodev/129592b4addcebdf6ccd
+	createStorageContainer();
+
 	return {
 		upload: upload,
 		remove: remove

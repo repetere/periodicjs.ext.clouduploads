@@ -2,6 +2,7 @@
 	"development":{
     "provider": "rackspace",
     "username": "your-user-name",
-    "apiKey": "your-api-key"
+    "apiKey": "your-api-key",
+    "region": "IAD"
 	}
 }
