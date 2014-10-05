@@ -7,12 +7,13 @@ var path = require('path'),
 	pkgcloud = require('pkgcloud'),
 	Utilities = require('periodicjs.core.utilities'),
 	ControllerHelper = require('periodicjs.core.controllerhelper'),
-  Extensions = require('periodicjs.core.extensions'),
-  cloudprovider,
-  cloudproviderfilepath,
-  cloudstorageclient,
-  cloudStorageClientError,
-  cloudStorageContainer,
+	Extensions = require('periodicjs.core.extensions'),
+	cloudprovider,
+	cloudproviderfilepath,
+	cloudstorageclient,
+	cloudStorageClientError,
+	cloudStorageContainer,
+	cloudStoragePublicPath,
 	CoreExtension,
 	CoreUtilities,
 	CoreController,
@@ -22,85 +23,90 @@ var path = require('path'),
 	logger;
 
 var upload = function (req, res, next) {
-	if(cloudStorageClientError){
+	if (cloudStorageClientError) {
 		CoreController.handleDocumentQueryErrorResponse({
 			err: cloudStorageClientError,
 			res: res,
 			req: req
 		});
 	}
-	else{
+	else {
+		// console.log('cloudprovider',cloudprovider);
+		var form = new formidable.IncomingForm(),
+			files = [],
+			returnFile,
+			returnFileObj = {},
+			// fields = [],
+			d = new Date(),
+			clouddir = 'clouduploads/files/' + d.getUTCFullYear() + '/' + d.getUTCMonth() + '/' + d.getUTCDate(),
+			uploadDirectory = '/public/' + clouddir,
+			fullUploadDir = path.join(process.cwd(), uploadDirectory);
+		req.controllerData = (req.controllerData) ? req.controllerData : {};
 
+		form.keepExtensions = true;
+		form.uploadDir = fullUploadDir;
+		form.parse(req, function (err, fields, files) {
+			// console.log(err, fields, files);
+		});
+		form.on('error', function (err) {
+			logger.error(err);
+			CoreController.handleDocumentQueryErrorResponse({
+				err: err,
+				res: res,
+				req: req
+			});
+		});
+		form.on('file', function (field, file) {
+			returnFile = file;
+			files.push(file);
+		});
+		form.on('end', function () {
+			var newfilename = req.user._id.toString() + '-' + CoreUtilities.makeNiceName(path.basename(returnFile.name, path.extname(returnFile.name))) + path.extname(returnFile.name),
+				newfilepath = path.join(clouddir, newfilename);
+
+
+			cloudstorageclient.upload({
+				container: cloudStorageContainer,
+				remote: newfilepath,
+				local: returnFile.path
+			}, function (err, result) {
+				//remove temp file
+				fs.remove(returnFile.path, function (err) {
+					if (err) {
+						logger.error(err);
+					}
+					else {
+						logger.silly('removing temp file', returnFile.path);
+					}
+				});
+
+				if (err) {
+					logger.error(err);
+					CoreController.handleDocumentQueryErrorResponse({
+						err: err,
+						res: res,
+						req: req
+					});
+				}
+				else if (result) {
+
+					returnFileObj.attributes = cloudStoragePublicPath;
+					returnFileObj.size = returnFile.size;
+					returnFileObj.filename = returnFile.name;
+					returnFileObj.assettype = returnFile.type;
+					returnFileObj.path = cloudStoragePublicPath.cdnUri + '/' + newfilepath;
+					returnFileObj.locationtype = cloudprovider.provider;
+					// returnFileObj.attributes.periodicDirectory = uploadDirectory;
+					// returnFileObj.attributes.periodicPath = path.join(cloudStoragePublicPath.cdnUri,newfilepath);
+					returnFileObj.fileurl = cloudStoragePublicPath.cdnUri + '/' + newfilepath;
+					returnFileObj.attributes.periodicFilename = newfilename;
+					// console.log('returnFileObj', returnFileObj);
+					req.controllerData.fileData = returnFileObj;
+					next();
+				}
+			});
+		});
 	}
-	console.log('cloudprovider',cloudprovider);
-	
-
-	// var form = new formidable.IncomingForm(),
-	// 	files = [],
-	// 	returnFile,
-	// 	returnFileObj = {},
-	// 	// fields = [],
-	// 	d = new Date(),
-	// 	uploadDirectory = '/public/clouduploads/files/' + d.getUTCFullYear() + '/' + d.getUTCMonth() + '/' + d.getUTCDate(),
-	// 	fullUploadDir = path.join(process.cwd(), uploadDirectory);
-	// req.controllerData = (req.controllerData) ? req.controllerData : {};
-	// fs.ensureDir(fullUploadDir, function (err) {
-	// 	if (err) {
-	// 		CoreController.handleDocumentQueryErrorResponse({
-	// 			err: err,
-	// 			res: res,
-	// 			req: req
-	// 		});
-	// 	}
-	// 	else {
-	// 		// http://stackoverflow.com/questions/20553575/how-to-cancel-user-upload-in-formidable-node-js
-	// 		form.keepExtensions = true;
-	// 		form.uploadDir = fullUploadDir;
-	// 		form.parse(req, function (err, fields, files) {
-	// 			logger.silly(err, fields, files);
-	// 		});
-	// 		form.on('error', function (err) {
-	// 			logger.error(err);
-	// 			CoreController.handleDocumentQueryErrorResponse({
-	// 				err: err,
-	// 				res: res,
-	// 				req: req
-	// 			});
-	// 		});
-	// 		form.on('file', function (field, file) {
-	// 			returnFile = file;
-	// 			files.push(file);
-	// 		});
-	// 		form.on('end', function () {
-	// 			var newfilename = req.user._id.toString() + '-' + CoreUtilities.makeNiceName(path.basename(returnFile.name, path.extname(returnFile.name))) + path.extname(returnFile.name),
-	// 				newfilepath = path.join(fullUploadDir, newfilename);
-	// 			fs.rename(returnFile.path, newfilepath, function (err) {
-	// 				if (err) {
-	// 					CoreController.handleDocumentQueryErrorResponse({
-	// 						err: err,
-	// 						res: res,
-	// 						req: req
-	// 					});
-	// 				}
-	// 				else {
-	// 					returnFileObj.attributes = {};
-	// 					returnFileObj.size = returnFile.size;
-	// 					returnFileObj.filename = returnFile.name;
-	// 					returnFileObj.assettype = returnFile.type;
-	// 					returnFileObj.path = newfilepath;
-	// 					returnFileObj.locationtype = 'local';
-	// 					returnFileObj.attributes.periodicDirectory = uploadDirectory;
-	// 					returnFileObj.attributes.periodicPath = path.join(uploadDirectory, newfilename);
-	// 					returnFileObj.fileurl = returnFileObj.attributes.periodicPath.replace('/public', '');
-	// 					returnFileObj.attributes.periodicFilename = newfilename;
-	// 					// console.log('returnFileObj',returnFileObj);
-	// 					req.controllerData.fileData = returnFileObj;
-	// 					next();
-	// 				}
-	// 			});
-	// 		});
-	// 	}
-	// });
 };
 
 var controller = function (resources) {
@@ -111,35 +117,60 @@ var controller = function (resources) {
 	CoreUtilities = new Utilities(resources);
 	CoreExtension = new Extensions(appSettings);
 	MediaAsset = mongoose.model('Asset');
-	cloudproviderfilepath = path.join(CoreExtension.getconfigdir({extname:'periodicjs.ext.clouduploads'}),'provider.json');
+	cloudproviderfilepath = path.join(CoreExtension.getconfigdir({
+		extname: 'periodicjs.ext.clouduploads'
+	}), 'provider.json');
 	// Collection = mongoose.model('Collection');
-	fs.readJson(cloudproviderfilepath,function(err,data){
-		if(err){
+	// 
+	// cdn files: https://github.com/pkgcloud/pkgcloud/issues/324
+	// rackspace: https://gist.github.com/rdodev/129592b4addcebdf6ccd
+	fs.readJson(cloudproviderfilepath, function (err, data) {
+		if (err) {
 			cloudStorageClientError = err;
 			logger.error(err);
 		}
-		else{
-			try{
+		else {
+			try {
 				cloudprovider = data[appSettings.application.environment];
 				cloudstorageclient = pkgcloud.storage.createClient(cloudprovider);
 
 				cloudstorageclient.createContainer({
-						name: 'periodic-uploads-env-'+appSettings.application.environment,
+						name: 'periodic-uploads-env-' + appSettings.application.environment,
+						type: 'public',
 						metadata: {
-						env: appSettings.application.environment,
-						name: appSettings.name
+							env: appSettings.application.environment,
+							name: appSettings.name
 						}
-					}, 
-					function(err, container) {
-						if(err){
+					},
+					function (err, container) {
+						if (err) {
+							cloudStorageClientError = err;
 							throw Error(err);
 						}
-						else{
+						else {
 							cloudStorageContainer = container;
+							if (cloudprovider.provider === 'rackspace') {
+								cloudstorageclient.setCdnEnabled(cloudStorageContainer, true, function (error, cont) {
+									if (error) {
+										cloudStorageClientError = error;
+										throw Error(error);
+									}
+									else if (cont) {
+										cloudStoragePublicPath = {
+											cdnUri: cont.cdnUri,
+											cdnSslUri: cont.cdnSslUri,
+											cdnStreamingUri: cont.cdnStreamingUri,
+											cdniOSUri: cont.cdniOSUri
+										};
+										// console.log('cont', cont);
+										logger.silly('Successfully Created CDN Bucket');
+									}
+								});
+							}
 						}
-				});
+					});
 			}
-			catch(e){
+			catch (e) {
 				cloudStorageClientError = e;
 				logger.error(e);
 			}

@@ -28,7 +28,7 @@ module.exports = function (grunt) {
 			all: [
 				'Gruntfile.js',
 				'index.js',
-				'contoller/**/*.js',
+				'controller/**/*.js',
 				'resources/**/*.js',
 				'test/**/*.js',
 			]
@@ -93,7 +93,7 @@ module.exports = function (grunt) {
 				cwd: 'public',
 				expand: true,
 				src: '**/*.*',
-				dest: '../../public/extensions/periodicjs.ext.admin',
+				dest: '../../public/extensions/periodicjs.ext.clouduploads',
 			},
 		},
 		watch: {
@@ -102,7 +102,7 @@ module.exports = function (grunt) {
 				files: [
 					'Gruntfile.js',
 					'index.js',
-					'contoller/**/*.js',
+					'controller/**/*.js',
 					'resources/**/*.js',
 					'test/**/*.js',
 				],
