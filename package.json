@@ -1,0 +1,61 @@
+{
+  "name": "periodicjs.ext.mailer",
+  "description": "mailer extension for periodicjs",
+  "version": "1.5.22",
+  "main": "index.js",
+  "engines": {
+    "node": ">=0.10.x"
+  },
+  "author": {
+    "name": "Yaw Joseph Etse",
+    "email": "yaw.etse@gmail.com",
+    "url": "http://about.me/yawjosephetse"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/typesettin/periodicjs.ext.mailer.git"
+  },
+  "scripts": {
+    "postinstall": "node install.js",
+    "postuninstall": "node uninstall.js"
+  },
+  "dependencies": {
+    "fs-extra": "0.9.1",
+    "nodemailer": "0.7.1",
+    "ejs": "1.0.0",
+    "periodicjs.core.controllerhelper": "~1.1.1",
+    "periodicjs.core.extensions": "~1.5.0",
+    "periodicjs.core.utilities": "~1.1.1",
+    "periodicjs.core.mailer": "~1.2.0"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "periodicjs"
+  ],
+  "gitHead": "da8ef47e7a9e9e5fd627feaf6f6345c1073805a4",
+  "bugs": {
+    "url": "https://github.com/typesettin/periodicjs.ext.mailer/issues"
+  },
+  "homepage": "https://github.com/typesettin/periodicjs.ext.mailer",
+  "_id": "periodicjs.ext.mailer@1.5.22",
+  "_shasum": "04aa4d6da440e5adffe56d16cfc4ad4b2552c25b",
+  "_from": "periodicjs.ext.mailer@1.5.22",
+  "_npmVersion": "2.0.0-beta.0",
+  "_npmUser": {
+    "name": "yawetse",
+    "email": "yaw.etse@gmail.com"
+  },
+  "maintainers": [
+    {
+      "name": "yawetse",
+      "email": "yaw.etse@gmail.com"
+    }
+  ],
+  "dist": {
+    "shasum": "04aa4d6da440e5adffe56d16cfc4ad4b2552c25b",
+    "tarball": "http://registry.npmjs.org/periodicjs.ext.mailer/-/periodicjs.ext.mailer-1.5.22.tgz"
+  },
+  "directories": {},
+  "_resolved": "https://registry.npmjs.org/periodicjs.ext.mailer/-/periodicjs.ext.mailer-1.5.22.tgz",
+  "readme": "ERROR: No README data found!"
+}
