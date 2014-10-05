@@ -1,11 +1,11 @@
 {
-	"name": "periodicjs.ext.mailer",
-	"periodicCompatibility":"1.2.0",
+	"name": "periodicjs.ext.cloudfiles",
+	"periodicCompatibility":"1.8.0",
 	"periodicDependencies": [],
 	"periodicjs.ext.admin": {
 		"menu": {
 			"Extensions": {
-				"Mailer": "<a href=\"/p-admin/mailer/\">Mail Settings</a>"
+				"Cloud Uploads": "<a href=\"/p-admin/clouduploads/\">Cloud Upload</a>"
 			}
 		}
 	}

@@ -1,11 +1,17 @@
 'use strict';
+var path = require('path');
 
 module.exports = function(periodic){
 	// express,app,logger,config,db,mongoose
-	var mailRouter = periodic.express.Router(),
-			mailController = require('./controller/mailer')(periodic);
+	var clouduploadController = require('./controller/cloudupload')(periodic),
+		mediaassetController = require(path.resolve(process.cwd(), './app/controller/asset'))(periodic),
+		mediaRouter = periodic.express.Router();
 
-	mailRouter.post('/testmail', mailController.sendmail);
 
-	periodic.app.use('/p-admin/mailer',mailRouter);
+	/**
+	 * admin/media manager routes
+	 */
+	mediaRouter.post('/new', clouduploadController.upload, mediaassetController.createassetfile);
+
+	periodic.app.use('/mediaasset', mediaRouter);
 };
