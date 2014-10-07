@@ -40,17 +40,22 @@ ExtensionCore.install({
 		}
 		else{
 			console.log(status);
-			ExtensionCore.moveExtensionBefore({
-				extname : extname,
-				movebefore:'periodicjs.ext.admin'
-			},function(err,movestatus){
-				if(err){
-					throw new Error(err);
-				}
-				else{
-					console.log(movestatus);
-				}
-			});
+			if(skipconffile){
+				console.log('extension config already set');
+			}
+			else{
+				ExtensionCore.moveExtensionBefore({
+					extname : extname,
+					movebefore:'periodicjs.ext.admin'
+				},function(err,movestatus){
+					if(err){
+						throw new Error(err);
+					}
+					else{
+						console.log(movestatus);
+					}
+				});	
+			}
 		}
 });
 
