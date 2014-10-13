@@ -41,7 +41,11 @@ module.exports = function (grunt) {
 		},
 		jsdoc: {
 			dist: {
-				src: ['lib/*.js', 'test/*.js'],
+				src: [
+					'index.js',
+					'controller/**/*.js',
+					'resources/**/*.js',
+				],
 				options: {
 					destination: 'doc/html',
 					configure: 'jsdoc.json'
@@ -93,7 +97,7 @@ module.exports = function (grunt) {
 				cwd: 'public',
 				expand: true,
 				src: '**/*.*',
-				dest: '../../public/extensions/periodicjs.ext.clouduploads',
+				dest: '../../public/extensions/periodicjs.ext.login',
 			},
 		},
 		watch: {

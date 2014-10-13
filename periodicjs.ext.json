@@ -1,5 +1,5 @@
 {
-	"periodicCompatibility":"1.8.0",
+	"periodicCompatibility":"1.90.0",
 	"periodicDependencies": [],
 	"periodicjs.ext.admin": {
 		"menu": {
