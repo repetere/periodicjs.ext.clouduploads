@@ -49,73 +49,85 @@ var upload = function (req, res, next) {
 			fullUploadDir = path.join(process.cwd(), uploadDirectory);
 		req.controllerData = (req.controllerData) ? req.controllerData : {};
 
-		form.keepExtensions = true;
-		form.uploadDir = fullUploadDir;
-		form.parse(req, function (err, fields, files) {
-			// console.log(err, fields, files);
-		});
-		form.on('error', function (err) {
-			logger.error(err);
-			CoreController.handleDocumentQueryErrorResponse({
-				err: err,
-				res: res,
-				req: req
-			});
-		});
-		form.on('file', function (field, file) {
-			returnFile = file;
-			files.push(file);
-		});
-		form.on('end', function () {
-			var newfilename = req.user._id.toString() + '-' + CoreUtilities.makeNiceName(path.basename(returnFile.name, path.extname(returnFile.name))) + path.extname(returnFile.name),
-				newfilepath = path.join(clouddir, newfilename);
-
-
-			cloudstorageclient.upload({
-				container: cloudStorageContainer,
-				remote: newfilepath,
-				local: returnFile.path,
-				headers: { // optionally provide raw headers to send to cloud files
-					'Cache-Control': 'max-age=86400'
-				}
-			}, function (err, result) {
-				//remove temp file
-				fs.remove(returnFile.path, function (err) {
-					if (err) {
-						logger.error(err);
-					}
-					else {
-						logger.silly('removing temp file', returnFile.path);
-					}
+		fs.ensureDir(fullUploadDir, function (err) {
+			if (err) {
+				CoreController.handleDocumentQueryErrorResponse({
+					err: err,
+					res: res,
+					req: req
 				});
-
-				if (err) {
+			}
+			else {
+				form.keepExtensions = true;
+				form.uploadDir = fullUploadDir;
+				form.parse(req, function (err, fields, files) {
+					// console.log(err, fields, files);
+				});
+				form.on('error', function (err) {
 					logger.error(err);
 					CoreController.handleDocumentQueryErrorResponse({
 						err: err,
 						res: res,
 						req: req
 					});
-				}
-				else if (result) {
-					returnFileObj.attributes = cloudStoragePublicPath;
-					returnFileObj.size = returnFile.size;
-					returnFileObj.filename = returnFile.name;
-					returnFileObj.assettype = returnFile.type;
-					returnFileObj.path = newfilepath;
-					returnFileObj.locationtype = cloudprovider.provider;
-					// returnFileObj.attributes.periodicDirectory = uploadDirectory;
-					// returnFileObj.attributes.periodicPath = path.join(cloudStoragePublicPath.cdnUri,newfilepath);
-					returnFileObj.fileurl = cloudStoragePublicPath.cdnUri + '/' + newfilepath;
-					returnFileObj.attributes.periodicFilename = newfilename;
-					returnFileObj.attributes.cloudfilepath = newfilepath;
-					returnFileObj.attributes.cloudcontainername = cloudStorageContainer.name;
-					// console.log('returnFileObj', returnFileObj);
-					req.controllerData.fileData = returnFileObj;
-					next();
-				}
-			});
+				});
+				form.on('file', function (field, file) {
+					returnFile = file;
+					files.push(file);
+				});
+				form.on('end', function () {
+					var newfilename = req.user._id.toString() + '-' + CoreUtilities.makeNiceName(path.basename(returnFile.name, path.extname(returnFile.name))) + path.extname(returnFile.name),
+						newfilepath = path.join(clouddir, newfilename);
+
+
+					cloudstorageclient.upload({
+						container: cloudStorageContainer,
+						remote: newfilepath,
+						local: returnFile.path,
+						headers: { // optionally provide raw headers to send to cloud files
+							'Cache-Control': 'max-age=86400'
+						}
+					}, function (err, result) {
+						//remove temp file
+						fs.remove(returnFile.path, function (err) {
+							if (err) {
+								logger.error(err);
+							}
+							else {
+								logger.silly('removing temp file', returnFile.path);
+							}
+						});
+
+						if (err) {
+							logger.error(err);
+							CoreController.handleDocumentQueryErrorResponse({
+								err: err,
+								res: res,
+								req: req
+							});
+						}
+						else if (result) {
+							returnFileObj.attributes = cloudStoragePublicPath;
+							returnFileObj.size = returnFile.size;
+							returnFileObj.filename = returnFile.name;
+							returnFileObj.assettype = returnFile.type;
+							returnFileObj.path = newfilepath;
+							returnFileObj.locationtype = cloudprovider.provider;
+							// returnFileObj.attributes.periodicDirectory = uploadDirectory;
+							// returnFileObj.attributes.periodicPath = path.join(cloudStoragePublicPath.cdnUri,newfilepath);
+							returnFileObj.fileurl = cloudStoragePublicPath.cdnUri + '/' + newfilepath;
+							returnFileObj.attributes.periodicFilename = newfilename;
+							returnFileObj.attributes.cloudfilepath = newfilepath;
+							returnFileObj.attributes.cloudcontainername = cloudStorageContainer.name;
+							// console.log('returnFileObj', returnFileObj);
+							req.controllerData.fileData = returnFileObj;
+							next();
+						}
+					});
+				});
+			}
 		});
+		
 	}
 };
 
