@@ -136,9 +136,9 @@ var upload = function (req, res, next) {
  * @param  {object} req 
  * @param  {object} res 
  */
-var remove = function (req, res) {
+var remove = function (req, res, next) {
 	var asset = req.controllerData.asset;
-	console.log('asset', asset);
+	// console.log('asset', asset);
 	if (asset.locationtype === 'rackspace') {
 		async.parallel({
 			deletefile: function (callback) {
@@ -175,6 +175,9 @@ var remove = function (req, res) {
 				});
 			}
 		});
+	}
+	else{
+		next();
 	}
 };
 
