@@ -14,6 +14,8 @@ $ npm install periodicjs.ext.clouduploads
 
 you can define your own pkgcloud provider configuration, after the extension has been installed, the extension configuration is located in `content/config/extensions/periodicjs.ext.clouduploads/provider.json`
 
+Remember for Amazon S3, you have to set your bucket policy correctly.
+
 ##Development
 *Make sure you have grunt installed*
 ```

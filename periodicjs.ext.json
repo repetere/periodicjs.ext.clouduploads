@@ -4,7 +4,7 @@
 	"periodicjs.ext.admin": {
 		"menu": {
 			"Extensions": {
-				"Cloud Uploads": "<a href=\"/p-admin/clouduploads/\">Cloud Upload</a>"
+				"Cloud Uploads": "<a href=\"/p-admin/extension/periodicjs.ext.clouduploads/\">Cloud Upload</a>"
 			}
 		}
 	}

@@ -91,7 +91,6 @@ var upload = function (req, res, next) {
 							}
 						});
 					}
-					console.log('newfilepath',newfilepath,'cloudStorageContainer',cloudStorageContainer);
 					try{
 						var cloudupload =	cloudstorageclient.upload({
 							container: cloudStorageContainer,
@@ -103,10 +102,9 @@ var upload = function (req, res, next) {
 							}
 						});
 
-						cloudupload.on('data',function(data){
-							console.log('cloudupload data',data);
-							
-						});
+						// cloudupload.on('data',function(data){
+						// 	console.log('cloudupload data',data);
+						// });
 
 						cloudupload.on('error',function(err){
 							console.log('cloudupload error',err);
@@ -133,8 +131,8 @@ var upload = function (req, res, next) {
 							returnFileObj.attributes.cloudfilepath = newfilepath;
 							returnFileObj.attributes.cloudcontainername = cloudStorageContainer.name || cloudStorageContainer;
 
-							console.log('cloudupload file',file)
-							console.log('returnFileObj', returnFileObj);
+							// console.log('cloudupload file',file)
+							// console.log('returnFileObj', returnFileObj);
 
 							req.controllerData.fileData = returnFileObj;
 							next();
@@ -172,7 +170,7 @@ var upload = function (req, res, next) {
 var remove = function (req, res, next) {
 	var asset = req.controllerData.asset;
 	// console.log('asset', asset);
-	if (asset.locationtype === 'rackspace') {
+	if (asset.locationtype === 'rackspace' || asset.locationtype === 'amazon') {
 		async.parallel({
 			deletefile: function (callback) {
 				cloudstorageclient.removeFile(asset.attributes.cloudcontainername, asset.attributes.cloudfilepath, callback);
@@ -239,15 +237,20 @@ var createStorageContainer = function () {
 							name: appSettings.name
 						}
 					};
-				// if(cloudprovider.provider ==='amazon'){
-				// 	storageContainerOptions.params = {};
-				// 	storageContainerOptions.params.Bucket = cloudprovider.Bucket ||  cloudprovider.bucket || storageContainerOptions.name;
-				// }
+				if(cloudprovider.provider ==='amazon'){
+
+					cloudStorageContainer = cloudprovider.containername || cloudprovider.Bucket ||  cloudprovider.bucket;
+					cloudStoragePublicPath = {
+						cdnUri: 'http://'+cloudstorageclient.s3.config.endpoint+'/'+cloudStorageContainer,
+						cdnSslUri: cloudstorageclient.s3.endpoint.href+cloudStorageContainer,
+						endpoint:cloudstorageclient.s3.endpoint
+					}
+				}
 				// console.log('cloudstorageclient',cloudstorageclient);
 				// console.log('cloudprovider',cloudprovider);
-				// console.log('storageContainerOptions',storageContainerOptions);
+				// // console.log('storageContainerOptions',storageContainerOptions);
 
-				if(cloudprovider.provider ==='rackspace'){
+				else if(cloudprovider.provider ==='rackspace'){
 					cloudstorageclient.createContainer(
 						storageContainerOptions,
 						function (err, container) {
@@ -258,7 +261,7 @@ var createStorageContainer = function () {
 								throw Error(err);
 							}
 							else {
-								console.log('crearted container');
+								console.log('created container');
 								cloudStorageContainer = container;
 								if (cloudprovider.provider === 'rackspace') {
 									cloudstorageclient.setCdnEnabled(cloudStorageContainer, true, function (error, cont) {
@@ -274,6 +277,7 @@ var createStorageContainer = function () {
 												cdniOSUri: cont.cdniOSUri
 											};
 											// console.log('cont', cont);
+											// console.log('cloudStoragePublicPath', cloudStoragePublicPath);
 											logger.silly('Successfully Created CDN Bucket');
 										}
 									});
@@ -281,10 +285,7 @@ var createStorageContainer = function () {
 							}
 						});
 				}
-				else{
-					cloudStorageContainer = cloudprovider.containername || cloudprovider.Bucket ||  cloudprovider.bucket;
-					cloudprovider.containername = cloudprovider.Bucket ||  cloudprovider.bucket;
-				}
+				cloudprovider.containername = cloudprovider.containername || cloudprovider.Bucket ||  cloudprovider.bucket || 'periodicjs';
 			}
 			catch (e) {
 				logger.error('cloudstorageclient.createContainer cloudStorageClientError');
