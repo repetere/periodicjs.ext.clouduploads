@@ -1,7 +1,7 @@
 {
   "name": "periodicjs.ext.clouduploads",
   "description": "An asset upload manager that uses pkgcloud to upload to the various cloud service providers (amazon s3, rackspace cloud files, etc)",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "main": "index.js",
   "engines": {
     "node": ">=0.10.x"
@@ -27,7 +27,7 @@
     "periodicjs.core.extensions": "~3.0.0",
     "periodicjs.core.mailer": "~3.0.0",
     "periodicjs.core.utilities": "~3.0.0",
-    "pkgcloud": "^0.9.6"
+    "pkgcloud": "^1.0.3"
   },
   "devDependencies": {
     "browserify": "~6.3.2",

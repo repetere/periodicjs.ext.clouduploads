@@ -37,7 +37,6 @@ var upload = function (req, res, next) {
 		});
 	}
 	else {
-		// console.log('cloudprovider',cloudprovider);
 		var form = new formidable.IncomingForm(),
 			files = [],
 			returnFile,
@@ -76,19 +75,13 @@ var upload = function (req, res, next) {
 					files.push(file);
 				});
 				form.on('end', function () {
-					var newfilename = req.user._id.toString() + '-' + CoreUtilities.makeNiceName(path.basename(returnFile.name, path.extname(returnFile.name))) + path.extname(returnFile.name),
+					var namespacewithusername = (req.user && req.user._id)? req.user._id.toString() + '-' : '',
+						newfilename = namespacewithusername + CoreUtilities.makeNiceName(path.basename(returnFile.name, path.extname(returnFile.name))) + path.extname(returnFile.name),
 						newfilepath = path.join(clouddir, newfilename);
 
+					var localuploadfile = fs.createReadStream(returnFile.path);
 
-					cloudstorageclient.upload({
-						container: cloudStorageContainer,
-						remote: newfilepath,
-						local: returnFile.path,
-						headers: { // optionally provide raw headers to send to cloud files
-							'Cache-Control': 'max-age=86400'
-						}
-					}, function (err, result) {
-						//remove temp file
+					var deletelocalfile = function(){ 
 						fs.remove(returnFile.path, function (err) {
 							if (err) {
 								logger.error(err);
@@ -97,16 +90,36 @@ var upload = function (req, res, next) {
 								logger.silly('removing temp file', returnFile.path);
 							}
 						});
+					}
+					console.log('newfilepath',newfilepath,'cloudStorageContainer',cloudStorageContainer);
+					try{
+						var cloudupload =	cloudstorageclient.upload({
+							container: cloudStorageContainer,
+							remote: newfilepath,
+							local: returnFile.path,
+					    ACL: "public-read",
+							headers: { // optionally provide raw headers to send to cloud files
+								'Cache-Control': 'max-age=86400'
+							}
+						});
 
-						if (err) {
+						cloudupload.on('data',function(data){
+							console.log('cloudupload data',data);
+							
+						});
+
+						cloudupload.on('error',function(err){
+							console.log('cloudupload error',err);
 							logger.error(err);
 							CoreController.handleDocumentQueryErrorResponse({
 								err: err,
 								res: res,
 								req: req
 							});
-						}
-						else if (result) {
+							deletelocalfile();
+						});
+
+						cloudupload.on('success',function(file){
 							returnFileObj.attributes = cloudStoragePublicPath;
 							returnFileObj.size = returnFile.size;
 							returnFileObj.filename = returnFile.name;
@@ -118,12 +131,32 @@ var upload = function (req, res, next) {
 							returnFileObj.fileurl = cloudStoragePublicPath.cdnUri + '/' + newfilepath;
 							returnFileObj.attributes.periodicFilename = newfilename;
 							returnFileObj.attributes.cloudfilepath = newfilepath;
-							returnFileObj.attributes.cloudcontainername = cloudStorageContainer.name;
-							// console.log('returnFileObj', returnFileObj);
+							returnFileObj.attributes.cloudcontainername = cloudStorageContainer.name || cloudStorageContainer;
+
+							console.log('cloudupload file',file)
+							console.log('returnFileObj', returnFileObj);
+
 							req.controllerData.fileData = returnFileObj;
 							next();
-						}
-					});
+							deletelocalfile();
+						});
+
+						cloudupload.on('end',function(){
+							console.log('cloudupload ended');
+						});
+
+						localuploadfile.pipe(cloudupload);
+					}
+					catch(e){
+						logger.error(e);
+						CoreController.handleDocumentQueryErrorResponse({
+							err: e,
+							res: res,
+							req: req
+						});
+						deletelocalfile();
+					}
+
 				});
 			}
 		});
@@ -191,51 +224,72 @@ var createStorageContainer = function () {
 	fs.readJson(cloudproviderfilepath, function (err, data) {
 		if (err) {
 			cloudStorageClientError = err;
+			logger.error('createStorageContainer readJson cloudproviderfilepath',cloudproviderfilepath);
 			logger.error(err);
 		}
 		else {
 			try {
 				cloudprovider = data[appSettings.application.environment];
 				cloudstorageclient = pkgcloud.storage.createClient(cloudprovider);
-
-				cloudstorageclient.createContainer({
+				var storageContainerOptions = {
 						name: (cloudprovider.containername) ? cloudprovider.containername : 'periodicjs',
 						type: 'public',
 						metadata: {
 							env: appSettings.application.environment,
 							name: appSettings.name
 						}
-					},
-					function (err, container) {
-						if (err) {
-							cloudStorageClientError = err;
-							throw Error(err);
-						}
-						else {
-							cloudStorageContainer = container;
-							if (cloudprovider.provider === 'rackspace') {
-								cloudstorageclient.setCdnEnabled(cloudStorageContainer, true, function (error, cont) {
-									if (error) {
-										cloudStorageClientError = error;
-										throw Error(error);
-									}
-									else if (cont) {
-										cloudStoragePublicPath = {
-											cdnUri: cont.cdnUri,
-											cdnSslUri: cont.cdnSslUri,
-											cdnStreamingUri: cont.cdnStreamingUri,
-											cdniOSUri: cont.cdniOSUri
-										};
-										// console.log('cont', cont);
-										logger.silly('Successfully Created CDN Bucket');
-									}
-								});
+					};
+				// if(cloudprovider.provider ==='amazon'){
+				// 	storageContainerOptions.params = {};
+				// 	storageContainerOptions.params.Bucket = cloudprovider.Bucket ||  cloudprovider.bucket || storageContainerOptions.name;
+				// }
+				// console.log('cloudstorageclient',cloudstorageclient);
+				// console.log('cloudprovider',cloudprovider);
+				// console.log('storageContainerOptions',storageContainerOptions);
+
+				if(cloudprovider.provider ==='rackspace'){
+					cloudstorageclient.createContainer(
+						storageContainerOptions,
+						function (err, container) {
+							if (err) {
+								console.log('failed on storage client',err);
+								console.log(err.stack);
+								cloudStorageClientError = err;
+								throw Error(err);
 							}
-						}
-					});
+							else {
+								console.log('crearted container');
+								cloudStorageContainer = container;
+								if (cloudprovider.provider === 'rackspace') {
+									cloudstorageclient.setCdnEnabled(cloudStorageContainer, true, function (error, cont) {
+										if (error) {
+											cloudStorageClientError = error;
+											throw Error(error);
+										}
+										else if (cont) {
+											cloudStoragePublicPath = {
+												cdnUri: cont.cdnUri,
+												cdnSslUri: cont.cdnSslUri,
+												cdnStreamingUri: cont.cdnStreamingUri,
+												cdniOSUri: cont.cdniOSUri
+											};
+											// console.log('cont', cont);
+											logger.silly('Successfully Created CDN Bucket');
+										}
+									});
+								}
+							}
+						});
+				}
+				else{
+					cloudStorageContainer = cloudprovider.containername || cloudprovider.Bucket ||  cloudprovider.bucket;
+					cloudprovider.containername = cloudprovider.Bucket ||  cloudprovider.bucket;
+				}
 			}
 			catch (e) {
+				logger.error('cloudstorageclient.createContainer cloudStorageClientError');
 				cloudStorageClientError = e;
+				console.log(e);
 				logger.error(e);
 			}
 		}
