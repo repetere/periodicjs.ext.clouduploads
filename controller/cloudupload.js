@@ -8,6 +8,7 @@ var path = require('path'),
 	Utilities = require('periodicjs.core.utilities'),
 	ControllerHelper = require('periodicjs.core.controller'),
 	Extensions = require('periodicjs.core.extensions'),
+	extend = require('util-extend'),
 	cloudprovider,
 	cloudproviderfilepath,
 	cloudstorageclient,
@@ -41,7 +42,8 @@ var upload = function (req, res, next) {
 			files = [],
 			returnFile,
 			returnFileObj = {},
-			// fields = [],
+			formfields,
+			formfiles,
 			d = new Date(),
 			clouddir = 'clouduploads/files/' + d.getUTCFullYear() + '/' + d.getUTCMonth() + '/' + d.getUTCDate(),
 			uploadDirectory = '/public/' + clouddir,
@@ -60,6 +62,8 @@ var upload = function (req, res, next) {
 				form.keepExtensions = true;
 				form.uploadDir = fullUploadDir;
 				form.parse(req, function (err, fields, files) {
+					formfields = fields;
+					formfiles = files;
 					// console.log(err, fields, files);
 				});
 				form.on('error', function (err) {
@@ -90,14 +94,15 @@ var upload = function (req, res, next) {
 								logger.silly('removing temp file', returnFile.path);
 							}
 						});
-					}
+					};
 					try{
 						var cloudupload =	cloudstorageclient.upload({
 							container: cloudStorageContainer,
 							remote: newfilepath,
 							local: returnFile.path,
-					    ACL: "public-read",
-							headers: { // optionally provide raw headers to send to cloud files
+					    ACL: 'public-read',
+							headers: { 
+							// optionally provide raw headers to send to cloud files
 								'Cache-Control': 'max-age=86400'
 							}
 						});
@@ -134,7 +139,9 @@ var upload = function (req, res, next) {
 							// console.log('cloudupload file',file)
 							// console.log('returnFileObj', returnFileObj);
 
-							req.controllerData.fileData = returnFileObj;
+							// req.controllerData.fileData = returnFileObj;
+							req.controllerData.fileData = extend(returnFileObj,formfields);
+
 							next();
 							deletelocalfile();
 						});
@@ -244,7 +251,7 @@ var createStorageContainer = function () {
 						cdnUri: 'http://'+cloudstorageclient.s3.config.endpoint+'/'+cloudStorageContainer,
 						cdnSslUri: cloudstorageclient.s3.endpoint.href+cloudStorageContainer,
 						endpoint:cloudstorageclient.s3.endpoint
-					}
+					};
 				}
 				// console.log('cloudstorageclient',cloudstorageclient);
 				// console.log('cloudprovider',cloudprovider);

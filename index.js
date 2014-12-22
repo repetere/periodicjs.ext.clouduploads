@@ -1,5 +1,4 @@
 'use strict';
-var path = require('path');
 
 /**
  * An asset upload manager that uses pkgcloud to upload to the various cloud service providers (amazon s3, rackspace cloud files
@@ -13,8 +12,12 @@ var path = require('path');
  */
 module.exports = function (periodic) {
 	// express,app,logger,config,db,mongoose
-	var clouduploadController = require('./controller/cloudupload')(periodic),
-		mediaassetController = require(path.resolve(process.cwd(), './app/controller/asset'))(periodic),
+	periodic.app.controller.extension.cloudupload = {
+		cloudupload: require('./controller/cloudupload')(periodic)
+	};
+
+	var clouduploadController = periodic.app.controller.extension.cloudupload.cloudupload,
+		mediaassetController = periodic.app.controller.native.asset,
 		mediaRouter = periodic.express.Router();
 
 	/**
@@ -24,4 +27,5 @@ module.exports = function (periodic) {
 	mediaRouter.post('/:id/delete', mediaassetController.loadAsset, clouduploadController.remove, mediaassetController.remove );
 
 	periodic.app.use('/mediaasset', mediaRouter);
+	return periodic;
 };
