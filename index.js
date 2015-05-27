@@ -12,20 +12,13 @@
  */
 module.exports = function (periodic) {
 	// express,app,logger,config,db,mongoose
+	// 		assetController = periodic.app.controller.native.asset,
+
 	periodic.app.controller.extension.cloudupload = {
 		cloudupload: require('./controller/cloudupload')(periodic)
 	};
+	periodic.app.controller.native.asset.multiupload = periodic.app.controller.extension.cloudupload.cloudupload.multiupload;
+	periodic.app.controller.native.asset.remove = periodic.app.controller.extension.cloudupload.cloudupload.remove;
 
-	var clouduploadController = periodic.app.controller.extension.cloudupload.cloudupload,
-		mediaassetController = periodic.app.controller.native.asset,
-		mediaRouter = periodic.express.Router();
-
-	/**
-	 * admin/media manager routes
-	 */
-	mediaRouter.post('/new', clouduploadController.upload, mediaassetController.createassetfile);
-	mediaRouter.post('/:id/delete', mediaassetController.loadAsset, clouduploadController.remove, mediaassetController.remove );
-
-	periodic.app.use('/mediaasset', mediaRouter);
 	return periodic;
 };
