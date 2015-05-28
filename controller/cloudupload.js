@@ -4,8 +4,9 @@ var path = require('path'),
 	async = require('async'),
 	fs = require('fs-extra'),
 	multer = require('multer'),
+	moment = require('moment'),
 	pkgcloud = require('pkgcloud'),
-	extend = require('util-extend'),
+	// extend = require('util-extend'),
 	cloudprovider,
 	cloudproviderfilepath,
 	cloudstorageclient,
@@ -15,19 +16,43 @@ var path = require('path'),
 	CoreExtension,
 	CoreUtilities,
 	CoreController,
-	multiupload_rename,
-	multiupload_changeDest,
-	multiupload_onParseStart,
+	// multiupload_rename,
+	// multiupload_changeDest,
+	// multiupload_onParseStart,
 	upload_dir,
+	temp_upload_dir,
 	appSettings,
 	mongoose,
 	MediaAsset,
 	logger;
 
+var multiupload_rename = function(fieldname,filename,req,res){
+	if(req.user){
+		return req.user._id+'-'+fieldname+'-'+filename+moment().format('YYYY-MM-DD_HH-m-ss');
+	}
+	else{
+		return fieldname+'-'+filename+moment().format('YYYY-MM-DD_HH-m-ss');
+	}
+};
+
+var multiupload_changeDest = function(dest, req, res) {
+	var current_date = moment().format('YYYY/MM/DD'),
+		upload_path_dir = path.join(process.cwd(), upload_dir,'cloudfiles',current_date);
+  		// return upload_path_dir; 
+
+	// logger.debug('upload_path_dir',upload_path_dir);
+	fs.ensureDirSync(upload_path_dir);
+	return upload_path_dir; 
+};
+
+var multiupload_onParseStart = function () {
+  logger.debug('Form parsing started at: ', new Date());
+};
+
 var multiupload = multer({
 	includeEmptyFields: false,
 	putSingleFilesInArray: true,
-	dest:path.join(process.cwd(),upload_dir, '/tmp'),
+	dest:temp_upload_dir,
 	rename: multiupload_rename,
 	changeDest: multiupload_changeDest,
 	onParseStart: multiupload_onParseStart,
@@ -35,11 +60,24 @@ var multiupload = multer({
 		logger.debug('req.body',req.body);
 		logger.debug('req.files',req.files);
 		var files = [],
+			current_date = moment().format('YYYY/MM/DD'),
+			clouddir = path.join('cloudfiles',current_date),
+			cloudfiles = [],
 			file_obj,
 			get_file_obj= function(data){
 				var returndata = data;
 				returndata.uploaddirectory = returndata.path.replace(process.cwd(),'').replace(returndata.name,'');
 				return returndata;
+			},
+			deletelocalfile = function(filepath){ 
+				fs.remove(filepath, function (err) {
+					if (err) {
+						logger.error(err);
+					}
+					else {
+						logger.silly('removing temp file', filepath);
+					}
+				});
 			};
 		for(var x in req.files){
 			if(Array.isArray(req.files[x])){
@@ -57,9 +95,81 @@ var multiupload = multer({
 				files.push(file_obj);
 			}
 		}
-		req.controllerData = (req.controllerData) ? req.controllerData : {};
-		req.controllerData.files = files;
-		next();
+		// req.controllerData = (req.controllerData) ? req.controllerData : {};
+		// req.controllerData.files = files;
+		// next();
+
+		try{
+			if(files){
+				async.eachSeries(files,
+					function(uploadedfile,eachcb){
+						var localuploadfile = fs.createReadStream(uploadedfile.path),
+							newfilepath = path.join(clouddir,uploadedfile.name),
+							cloudupload =	cloudstorageclient.upload({
+								container: cloudStorageContainer,
+								remote: newfilepath,
+								local: uploadedfile.path,
+								'Cache-Control': 'max-age=86400',
+								cacheControl: 'max-age=86400',
+						    ACL: 'public-read',
+						    acl: 'public-read',
+								headers: { 
+								// optionally provide raw headers to send to cloud files
+									'cache-control': 'max-age=86400',
+									'Cache-Control': 'max-age=86400',
+									'x-amz-meta-Cache-Control' : 'max-age=86400' 
+
+								}
+							});
+						cloudupload.on('success',function(uploaded_cloud_file){
+							uploaded_cloud_file.attributes = cloudStoragePublicPath;
+							uploaded_cloud_file.size = uploadedfile.size;
+							uploaded_cloud_file.filename = uploadedfile.name;
+							uploaded_cloud_file.name = uploadedfile.name;
+							uploaded_cloud_file.assettype = uploadedfile.mimetype;
+							uploaded_cloud_file.path = newfilepath;
+							uploaded_cloud_file.locationtype = cloudprovider.provider;
+							// uploaded_cloud_file.attributes.periodicDirectory = uploadDirectory;
+							// uploaded_cloud_file.attributes.periodicPath = path.join(cloudStoragePublicPath.cdnUri,newfilepath);
+							uploaded_cloud_file.fileurl = cloudStoragePublicPath.cdnUri + '/' + newfilepath;
+							uploaded_cloud_file.attributes.periodicFilename = uploadedfile.name;
+							uploaded_cloud_file.attributes.cloudfilepath = newfilepath;
+							uploaded_cloud_file.attributes.cloudcontainername = cloudStorageContainer.name || cloudStorageContainer;
+
+							logger.silly('uploaded_cloud_file',uploaded_cloud_file);
+							cloudfiles.push(uploaded_cloud_file);
+							eachcb();
+							deletelocalfile(uploadedfile.path);
+						});
+						// cloudupload.on('end',function(){
+						// 	deletelocalfile(uploadedfile.path);
+						// });
+						cloudupload.on('error',function(err){
+							logger.error('asyncadmin - async each cloudupload error',err);
+							eachcb(err);
+							deletelocalfile(uploadedfile.path);
+						});
+						localuploadfile.pipe(cloudupload);
+
+				},function(err){
+					if(err){
+						next(err);
+					}
+					else{
+						req.controllerData = (req.controllerData) ? req.controllerData : {};
+						req.controllerData.files = cloudfiles;
+						next();
+					}
+				});
+			}
+			else{
+				next();
+			}
+		}
+		catch(e){
+			logger.error('asyncadmin - cloudupload.multiupload',e);
+			next(e);
+		}
 	}
 });	
 
@@ -293,10 +403,6 @@ var createStorageContainer = function () {
 						endpoint:cloudstorageclient.s3.endpoint
 					};
 				}
-				// console.log('cloudstorageclient',cloudstorageclient);
-				// console.log('cloudprovider',cloudprovider);
-				// // console.log('storageContainerOptions',storageContainerOptions);
-
 				else if(cloudprovider.provider ==='rackspace'){
 					cloudstorageclient.createContainer(
 						storageContainerOptions,
@@ -332,6 +438,9 @@ var createStorageContainer = function () {
 							}
 						});
 				}
+				// console.log('cloudstorageclient',cloudstorageclient);
+				// console.log('cloudprovider',cloudprovider);
+				// console.log('storageContainerOptions',storageContainerOptions);
 				cloudprovider.containername = cloudprovider.containername || cloudprovider.Bucket ||  cloudprovider.bucket || 'periodicjs';
 			}
 			catch (e) {
@@ -369,10 +478,14 @@ var controller = function (resources) {
 	CoreUtilities = resources.core.utilities;
 	CoreExtension = resources.core.extension;
 	MediaAsset = mongoose.model('Asset');
-	multiupload_rename = resources.app.controller.native.asset.multiupload_rename;	
-	multiupload_changeDest = resources.app.controller.native.asset.multiupload_changeDest;
-	multiupload_onParseStart = resources.app.controller.native.asset.multiupload_onParseStart;
+	// multiupload_rename = resources.app.controller.native.asset.multiupload_rename;	
+	// multiupload_changeDest = resources.app.controller.native.asset.multiupload_changeDest;
+	// multiupload_onParseStart = resources.app.controller.native.asset.multiupload_onParseStart;
 	upload_dir = resources.app.controller.native.asset.upload_dir;
+	temp_upload_dir = path.join(process.cwd(),upload_dir, '/tmp');
+
+	// console.log('temp_upload_dir',temp_upload_dir);
+	// console.log('resources.app.controller.native.asset',resources.app.controller.native.asset);
 
 	cloudproviderfilepath = path.join(CoreExtension.getconfigdir({
 		extname: 'periodicjs.ext.clouduploads'
