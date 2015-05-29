@@ -112,7 +112,7 @@ var multiupload = multer({
 								'Cache-Control': 'public, max-age=86400',
 								cacheControl: 'public, max-age=86400',
 						    ACL: 'public-read',
-						    // acl: 'public-read',
+						    acl: 'public-read',
 								headers: { 
 								// optionally provide raw headers to send to cloud files
 									'cache-control': 'public, max-age=86400',
