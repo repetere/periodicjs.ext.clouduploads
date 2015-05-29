@@ -109,16 +109,15 @@ var multiupload = multer({
 								container: cloudStorageContainer,
 								remote: newfilepath,
 								local: uploadedfile.path,
-								'Cache-Control': 'max-age=86400',
-								cacheControl: 'max-age=86400',
+								'Cache-Control': 'public, max-age=86400',
+								cacheControl: 'public, max-age=86400',
 						    ACL: 'public-read',
-						    acl: 'public-read',
+						    // acl: 'public-read',
 								headers: { 
 								// optionally provide raw headers to send to cloud files
-									'cache-control': 'max-age=86400',
-									'Cache-Control': 'max-age=86400',
-									'x-amz-meta-Cache-Control' : 'max-age=86400' 
-
+									'cache-control': 'public, max-age=86400',
+									'Cache-Control': 'public, max-age=86400',
+									'x-amz-meta-Cache-Control' : 'public, max-age=86400' 
 								}
 							});
 						cloudupload.on('success',function(uploaded_cloud_file){
@@ -131,12 +130,13 @@ var multiupload = multer({
 							uploaded_cloud_file.locationtype = cloudprovider.provider;
 							// uploaded_cloud_file.attributes.periodicDirectory = uploadDirectory;
 							// uploaded_cloud_file.attributes.periodicPath = path.join(cloudStoragePublicPath.cdnUri,newfilepath);
-							uploaded_cloud_file.fileurl = cloudStoragePublicPath.cdnUri + '/' + newfilepath;
+							var filelocation = (cloudprovider.provider ==='amazon') ? uploaded_cloud_file.location : cloudStoragePublicPath.cdnUri + '/' + newfilepath;
+							uploaded_cloud_file.fileurl = filelocation;
 							uploaded_cloud_file.attributes.periodicFilename = uploadedfile.name;
 							uploaded_cloud_file.attributes.cloudfilepath = newfilepath;
 							uploaded_cloud_file.attributes.cloudcontainername = cloudStorageContainer.name || cloudStorageContainer;
 
-							logger.silly('uploaded_cloud_file',uploaded_cloud_file);
+							logger.silly('asyncadmin - uploaded_cloud_file',uploaded_cloud_file);
 							cloudfiles.push(uploaded_cloud_file);
 							eachcb();
 							deletelocalfile(uploadedfile.path);
@@ -172,152 +172,6 @@ var multiupload = multer({
 		}
 	}
 });	
-
-/**
- * upload a document from a form upload, store it in your cloud provider storage, remove from server after moved to cloud service
- * @param  {object} req 
- * @param  {object} res 
- * @return {Function} next() callback
- */
-// var upload = function (req, res, next) {
-// 	if (cloudStorageClientError) {
-// 		CoreController.handleDocumentQueryErrorResponse({
-// 			err: cloudStorageClientError,
-// 			res: res,
-// 			req: req
-// 		});
-// 	}
-// 	else {
-// 		var form = new formidable.IncomingForm(),
-// 			files = [],
-// 			returnFile,
-// 			returnFileObj = {},
-// 			formfields,
-// 			formfiles,
-// 			d = new Date(),
-// 			clouddir = 'clouduploads/files/' + d.getUTCFullYear() + '/' + d.getUTCMonth() + '/' + d.getUTCDate(),
-// 			uploadDirectory = '/public/' + clouddir,
-// 			fullUploadDir = path.join(process.cwd(), uploadDirectory);
-// 		req.controllerData = (req.controllerData) ? req.controllerData : {};
-
-// 		fs.ensureDir(fullUploadDir, function (err) {
-// 			if (err) {
-// 				CoreController.handleDocumentQueryErrorResponse({
-// 					err: err,
-// 					res: res,
-// 					req: req
-// 				});
-// 			}
-// 			else {
-// 				form.keepExtensions = true;
-// 				form.uploadDir = fullUploadDir;
-// 				form.parse(req, function (err, fields, files) {
-// 					formfields = fields;
-// 					formfiles = files;
-// 					// console.log(err, fields, files);
-// 				});
-// 				form.on('error', function (err) {
-// 					logger.error(err);
-// 					CoreController.handleDocumentQueryErrorResponse({
-// 						err: err,
-// 						res: res,
-// 						req: req
-// 					});
-// 				});
-// 				form.on('file', function (field, file) {
-// 					returnFile = file;
-// 					files.push(file);
-// 				});
-// 				form.on('end', function () {
-// 					var namespacewithusername = (req.user && req.user._id)? req.user._id.toString() + '-' : '',
-// 						newfilename = namespacewithusername + CoreUtilities.makeNiceName(path.basename(returnFile.name, path.extname(returnFile.name))) + path.extname(returnFile.name),
-// 						newfilepath = path.join(clouddir, newfilename);
-
-// 					var localuploadfile = fs.createReadStream(returnFile.path);
-
-// 					var deletelocalfile = function(){ 
-// 						fs.remove(returnFile.path, function (err) {
-// 							if (err) {
-// 								logger.error(err);
-// 							}
-// 							else {
-// 								logger.silly('removing temp file', returnFile.path);
-// 							}
-// 						});
-// 					};
-// 					try{
-// 						var cloudupload =	cloudstorageclient.upload({
-// 							container: cloudStorageContainer,
-// 							remote: newfilepath,
-// 							local: returnFile.path,
-// 					    ACL: 'public-read',
-// 							headers: { 
-// 							// optionally provide raw headers to send to cloud files
-// 								'Cache-Control': 'max-age=86400'
-// 							}
-// 						});
-
-// 						// cloudupload.on('data',function(data){
-// 						// 	console.log('cloudupload data',data);
-// 						// });
-
-// 						cloudupload.on('error',function(err){
-// 							console.log('cloudupload error',err);
-// 							logger.error(err);
-// 							CoreController.handleDocumentQueryErrorResponse({
-// 								err: err,
-// 								res: res,
-// 								req: req
-// 							});
-// 							deletelocalfile();
-// 						});
-
-// 						cloudupload.on('success',function(file){
-// 							returnFileObj.attributes = cloudStoragePublicPath;
-// 							returnFileObj.size = returnFile.size;
-// 							returnFileObj.filename = returnFile.name;
-// 							returnFileObj.assettype = returnFile.type;
-// 							returnFileObj.path = newfilepath;
-// 							returnFileObj.locationtype = cloudprovider.provider;
-// 							// returnFileObj.attributes.periodicDirectory = uploadDirectory;
-// 							// returnFileObj.attributes.periodicPath = path.join(cloudStoragePublicPath.cdnUri,newfilepath);
-// 							returnFileObj.fileurl = cloudStoragePublicPath.cdnUri + '/' + newfilepath;
-// 							returnFileObj.attributes.periodicFilename = newfilename;
-// 							returnFileObj.attributes.cloudfilepath = newfilepath;
-// 							returnFileObj.attributes.cloudcontainername = cloudStorageContainer.name || cloudStorageContainer;
-
-// 							// console.log('cloudupload file',file)
-// 							// console.log('returnFileObj', returnFileObj);
-
-// 							// req.controllerData.fileData = returnFileObj;
-// 							req.controllerData.fileData = extend(returnFileObj,formfields);
-
-// 							next();
-// 							deletelocalfile();
-// 						});
-
-// 						cloudupload.on('end',function(){
-// 							console.log('cloudupload ended');
-// 						});
-
-// 						localuploadfile.pipe(cloudupload);
-// 					}
-// 					catch(e){
-// 						logger.error(e);
-// 						CoreController.handleDocumentQueryErrorResponse({
-// 							err: e,
-// 							res: res,
-// 							req: req
-// 						});
-// 						deletelocalfile();
-// 					}
-
-// 				});
-// 			}
-// 		});
-		
-// 	}
-// };
 
 /**
  * deletes file from cloud and removes document from mongo database
