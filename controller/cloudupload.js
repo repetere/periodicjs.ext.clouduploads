@@ -28,10 +28,10 @@ var path = require('path'),
 
 var multiupload_rename = function(fieldname,filename,req,res){
 	if(req.user){
-		return req.user._id+'-'+fieldname+'-'+filename+moment().format('YYYY-MM-DD_HH-m-ss');
+		return req.user._id+'-'+filename+'_'+moment().format('YYYY-MM-DD_HH-m-ss');
 	}
 	else{
-		return fieldname+'-'+filename+moment().format('YYYY-MM-DD_HH-m-ss');
+		return fieldname+'-'+filename+'_'+moment().format('YYYY-MM-DD_HH-m-ss');
 	}
 };
 
@@ -49,14 +49,71 @@ var multiupload_onParseStart = function () {
   logger.debug('Form parsing started at: ', new Date());
 };
 
-var multiupload = multer({
-	includeEmptyFields: false,
-	putSingleFilesInArray: true,
-	dest:temp_upload_dir,
-	rename: multiupload_rename,
-	changeDest: multiupload_changeDest,
-	onParseStart: multiupload_onParseStart,
-	onParseEnd: function(req,next){
+var	deletelocalfile = function(filepath){ 
+	fs.remove(filepath, function (err) {
+		if (err) {
+			logger.error(err);
+		}
+		else {
+			logger.silly('removing temp file', filepath);
+		}
+	});
+};
+
+var uploadFileIterator = function(uploadedfile,callback){
+	logger.silly('uploadFileIterator running');
+	var current_date = moment().format('YYYY/MM/DD'),
+		clouddir = path.join('cloudfiles',current_date),
+		localuploadfile = fs.createReadStream(uploadedfile.path),
+		newfilepath = path.join(clouddir,uploadedfile.name),
+		cloudupload =	cloudstorageclient.upload({
+			container: cloudStorageContainer,
+			remote: newfilepath,
+			local: uploadedfile.path,
+			'Cache-Control': 'public, max-age=86400',
+			cacheControl: 'public, max-age=86400',
+	    ACL: 'public-read',
+	    acl: 'public-read',
+			headers: { 
+			// optionally provide raw headers to send to cloud files
+				'cache-control': 'public, max-age=86400',
+				'Cache-Control': 'public, max-age=86400',
+				'x-amz-meta-Cache-Control' : 'public, max-age=86400' 
+			}
+		});
+	cloudupload.on('success',function(uploaded_cloud_file){
+		uploaded_cloud_file.attributes = cloudStoragePublicPath;
+		uploaded_cloud_file.size = uploadedfile.size;
+		uploaded_cloud_file.filename = uploadedfile.name;
+		uploaded_cloud_file.name = uploadedfile.name;
+		uploaded_cloud_file.assettype = uploadedfile.mimetype;
+		uploaded_cloud_file.path = newfilepath;
+		uploaded_cloud_file.locationtype = cloudprovider.provider;
+		// uploaded_cloud_file.attributes.periodicDirectory = uploadDirectory;
+		// uploaded_cloud_file.attributes.periodicPath = path.join(cloudStoragePublicPath.cdnUri,newfilepath);
+		var filelocation = (cloudprovider.provider ==='amazon') ? uploaded_cloud_file.location : cloudStoragePublicPath.cdnUri + '/' + newfilepath;
+		uploaded_cloud_file.fileurl = filelocation;
+		uploaded_cloud_file.attributes.periodicFilename = uploadedfile.name;
+		uploaded_cloud_file.attributes.cloudfilepath = newfilepath;
+		uploaded_cloud_file.attributes.cloudcontainername = cloudStorageContainer.name || cloudStorageContainer;
+
+		logger.silly('asyncadmin - uploaded_cloud_file',uploaded_cloud_file);
+		// cloudfiles.push(uploaded_cloud_file);
+		callback(null,uploaded_cloud_file);
+		deletelocalfile(uploadedfile.path);
+	});
+	// cloudupload.on('end',function(){
+	// 	deletelocalfile(uploadedfile.path);
+	// });
+	cloudupload.on('error',function(err){
+		logger.error('asyncadmin - async each cloudupload error',err);
+		callback(err);
+		deletelocalfile(uploadedfile.path);
+	});
+	localuploadfile.pipe(cloudupload);
+};
+
+var multiupload_onParseEnd = function(req,next){
 		logger.debug('req.body',req.body);
 		logger.debug('req.files',req.files);
 		var files = [],
@@ -68,16 +125,6 @@ var multiupload = multer({
 				var returndata = data;
 				returndata.uploaddirectory = returndata.path.replace(process.cwd(),'').replace(returndata.name,'');
 				return returndata;
-			},
-			deletelocalfile = function(filepath){ 
-				fs.remove(filepath, function (err) {
-					if (err) {
-						logger.error(err);
-					}
-					else {
-						logger.silly('removing temp file', filepath);
-					}
-				});
 			};
 		for(var x in req.files){
 			if(Array.isArray(req.files[x])){
@@ -103,54 +150,15 @@ var multiupload = multer({
 			if(files){
 				async.eachSeries(files,
 					function(uploadedfile,eachcb){
-						var localuploadfile = fs.createReadStream(uploadedfile.path),
-							newfilepath = path.join(clouddir,uploadedfile.name),
-							cloudupload =	cloudstorageclient.upload({
-								container: cloudStorageContainer,
-								remote: newfilepath,
-								local: uploadedfile.path,
-								'Cache-Control': 'public, max-age=86400',
-								cacheControl: 'public, max-age=86400',
-						    ACL: 'public-read',
-						    acl: 'public-read',
-								headers: { 
-								// optionally provide raw headers to send to cloud files
-									'cache-control': 'public, max-age=86400',
-									'Cache-Control': 'public, max-age=86400',
-									'x-amz-meta-Cache-Control' : 'public, max-age=86400' 
-								}
-							});
-						cloudupload.on('success',function(uploaded_cloud_file){
-							uploaded_cloud_file.attributes = cloudStoragePublicPath;
-							uploaded_cloud_file.size = uploadedfile.size;
-							uploaded_cloud_file.filename = uploadedfile.name;
-							uploaded_cloud_file.name = uploadedfile.name;
-							uploaded_cloud_file.assettype = uploadedfile.mimetype;
-							uploaded_cloud_file.path = newfilepath;
-							uploaded_cloud_file.locationtype = cloudprovider.provider;
-							// uploaded_cloud_file.attributes.periodicDirectory = uploadDirectory;
-							// uploaded_cloud_file.attributes.periodicPath = path.join(cloudStoragePublicPath.cdnUri,newfilepath);
-							var filelocation = (cloudprovider.provider ==='amazon') ? uploaded_cloud_file.location : cloudStoragePublicPath.cdnUri + '/' + newfilepath;
-							uploaded_cloud_file.fileurl = filelocation;
-							uploaded_cloud_file.attributes.periodicFilename = uploadedfile.name;
-							uploaded_cloud_file.attributes.cloudfilepath = newfilepath;
-							uploaded_cloud_file.attributes.cloudcontainername = cloudStorageContainer.name || cloudStorageContainer;
-
-							logger.silly('asyncadmin - uploaded_cloud_file',uploaded_cloud_file);
-							cloudfiles.push(uploaded_cloud_file);
-							eachcb();
-							deletelocalfile(uploadedfile.path);
+						uploadFileIterator(uploadedfile,function(err,uploaded_cloud_file){
+							if(err){
+								eachcb(err);
+							}
+							else{
+								cloudfiles.push(uploaded_cloud_file);
+								eachcb();
+							}
 						});
-						// cloudupload.on('end',function(){
-						// 	deletelocalfile(uploadedfile.path);
-						// });
-						cloudupload.on('error',function(err){
-							logger.error('asyncadmin - async each cloudupload error',err);
-							eachcb(err);
-							deletelocalfile(uploadedfile.path);
-						});
-						localuploadfile.pipe(cloudupload);
-
 				},function(err){
 					if(err){
 						next(err);
@@ -170,7 +178,16 @@ var multiupload = multer({
 			logger.error('asyncadmin - cloudupload.multiupload',e);
 			next(e);
 		}
-	}
+	};
+
+var multiupload = multer({
+	includeEmptyFields: false,
+	putSingleFilesInArray: true,
+	dest:temp_upload_dir,
+	rename: multiupload_rename,
+	changeDest: multiupload_changeDest,
+	onParseStart: multiupload_onParseStart,
+	onParseEnd: multiupload_onParseEnd
 });	
 
 /**
@@ -352,6 +369,8 @@ var controller = function (resources) {
 
 	return {
 		multiupload: multiupload,
+		multiupload_onParseEnd: multiupload_onParseEnd,
+		uploadFileIterator: uploadFileIterator,
 		remove: remove
 	};
 };
