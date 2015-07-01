@@ -6,7 +6,7 @@ var path = require('path'),
 	multer = require('multer'),
 	moment = require('moment'),
 	pkgcloud = require('@yawetse/pkgcloud'),
-	// extend = require('util-extend'),
+	extend = require('util-extend'),
 	cloudprovider,
 	cloudproviderfilepath,
 	cloudstorageclient,
@@ -61,7 +61,7 @@ var	deletelocalfile = function(filepath){
 };
 
 var uploadFileIterator = function(uploadedfile,callback){
-	logger.silly('uploadFileIterator running');
+	logger.silly('uploadFileIterator running',uploadedfile);
 	var current_date = moment().format('YYYY/MM/DD'),
 		clouddir = path.join('cloudfiles',current_date),
 		localuploadfile = fs.createReadStream(uploadedfile.path),
@@ -72,12 +72,15 @@ var uploadFileIterator = function(uploadedfile,callback){
 			local: uploadedfile.path,
 			'Cache-Control': 'public, max-age=86400',
 			cacheControl: 'public, max-age=86400',
+			'Content-Type': uploadedfile.mimetype,
+			contentType: uploadedfile.mimetype,
 	    ACL: 'public-read',
 	    acl: 'public-read',
 			headers: { 
 			// optionally provide raw headers to send to cloud files
 				'cache-control': 'public, max-age=86400',
 				'Cache-Control': 'public, max-age=86400',
+				'Content-Type': uploadedfile.mimetype,
 				'x-amz-meta-Cache-Control' : 'public, max-age=86400' 
 			}
 		});
@@ -87,6 +90,7 @@ var uploadFileIterator = function(uploadedfile,callback){
 		uploaded_cloud_file.filename = uploadedfile.name;
 		uploaded_cloud_file.name = uploadedfile.name;
 		uploaded_cloud_file.assettype = uploadedfile.mimetype;
+		uploaded_cloud_file.mimetype = uploadedfile.mimetype;
 		uploaded_cloud_file.path = newfilepath;
 		uploaded_cloud_file.locationtype = cloudprovider.provider;
 		// uploaded_cloud_file.attributes.periodicDirectory = uploadDirectory;
@@ -96,8 +100,8 @@ var uploadFileIterator = function(uploadedfile,callback){
 		uploaded_cloud_file.attributes.periodicFilename = uploadedfile.name;
 		uploaded_cloud_file.attributes.cloudfilepath = newfilepath;
 		uploaded_cloud_file.attributes.cloudcontainername = cloudStorageContainer.name || cloudStorageContainer;
-
-		logger.silly('asyncadmin - uploaded_cloud_file',uploaded_cloud_file);
+		uploaded_cloud_file = extend(uploadedfile,uploaded_cloud_file);
+		// logger.silly('asyncadmin - uploaded_cloud_file',uploaded_cloud_file);
 		// cloudfiles.push(uploaded_cloud_file);
 		callback(null,uploaded_cloud_file);
 		deletelocalfile(uploadedfile.path);
@@ -151,6 +155,7 @@ var multiupload_onParseEnd = function(req,next){
 				async.eachSeries(files,
 					function(uploadedfile,eachcb){
 						uploadFileIterator(uploadedfile,function(err,uploaded_cloud_file){
+							// console.log('err,uploaded_cloud_file',err,uploaded_cloud_file);
 							if(err){
 								eachcb(err);
 							}
@@ -200,11 +205,16 @@ var remove = function (req, res) {
 	async.parallel({
 			deletefile: function (callback) {
 				// console.log('asset', asset);
-				if (asset.locationtype === 'rackspace' || asset.locationtype === 'amazon') {
-					cloudstorageclient.removeFile(asset.attributes.cloudcontainername, asset.attributes.cloudfilepath, callback);
+				try{
+					if (asset.locationtype === 'rackspace' || asset.locationtype === 'amazon') {
+						cloudstorageclient.removeFile(asset.attributes.cloudcontainername, asset.attributes.cloudfilepath, callback);
+					}
+					else{
+						fs.remove(path.join(process.cwd(), asset.attributes.periodicPath), callback);
+					}
 				}
-				else{
-					fs.remove(path.join(process.cwd(), asset.attributes.periodicPath), callback);
+				catch(e){
+					callback(e);
 				}
 			},
 			removeasset: function (callback) {
@@ -220,6 +230,7 @@ var remove = function (req, res) {
 			//, results
 		) {
 		if (err) {
+			logger.error('err',err);
 			CoreController.handleDocumentQueryErrorResponse({
 				err: err,
 				res: res,
