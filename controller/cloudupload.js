@@ -24,30 +24,31 @@ var path = require('path'),
 	appSettings,
 	mongoose,
 	MediaAsset,
-	logger;
+	logger,
+	multiupload;
 
-var multiupload_rename = function(fieldname,filename,req,res){
-	if(req.user){
-		return req.user._id+'-'+filename+'_'+moment().format('YYYY-MM-DD_HH-m-ss');
-	}
-	else{
-		return fieldname+'-'+filename+'_'+moment().format('YYYY-MM-DD_HH-m-ss');
-	}
-};
+// var multiupload_rename = function(fieldname,filename,req,res){
+// 	if(req.user){
+// 		return req.user._id+'-'+filename+'_'+moment().format('YYYY-MM-DD_HH-m-ss');
+// 	}
+// 	else{
+// 		return fieldname+'-'+filename+'_'+moment().format('YYYY-MM-DD_HH-m-ss');
+// 	}
+// };
 
-var multiupload_changeDest = function(dest, req, res) {
-	var current_date = moment().format('YYYY/MM/DD'),
-		upload_path_dir = path.join(process.cwd(), upload_dir,'cloudfiles',current_date);
-  		// return upload_path_dir; 
+// var multiupload_changeDest = function(dest, req, res) {
+// 	var current_date = moment().format('YYYY/MM/DD'),
+// 		upload_path_dir = path.join(process.cwd(), upload_dir,'cloudfiles',current_date);
+//   		// return upload_path_dir; 
 
-	// logger.debug('upload_path_dir',upload_path_dir);
-	fs.ensureDirSync(upload_path_dir);
-	return upload_path_dir; 
-};
+// 	// logger.debug('upload_path_dir',upload_path_dir);
+// 	fs.ensureDirSync(upload_path_dir);
+// 	return upload_path_dir; 
+// };
 
-var multiupload_onParseStart = function () {
-  logger.debug('Form parsing started at: ', new Date());
-};
+// var multiupload_onParseStart = function () {
+//   logger.debug('Form parsing started at: ', new Date());
+// };
 
 var	deletelocalfile = function(filepath){ 
 	fs.remove(filepath, function (err) {
@@ -185,15 +186,7 @@ var multiupload_onParseEnd = function(req,next){
 		}
 	};
 
-var multiupload = multer({
-	includeEmptyFields: false,
-	putSingleFilesInArray: true,
-	dest:temp_upload_dir,
-	rename: multiupload_rename,
-	changeDest: multiupload_changeDest,
-	onParseStart: multiupload_onParseStart,
-	onParseEnd: multiupload_onParseEnd
-});	
+
 
 /**
  * deletes file from cloud and removes document from mongo database
@@ -377,6 +370,18 @@ var controller = function (resources) {
 	// cdn files: https://github.com/pkgcloud/pkgcloud/issues/324
 	// rackspace: https://gist.github.com/rdodev/129592b4addcebdf6ccd
 	createStorageContainer();
+
+	// console.log('resources.app.controller.native.asset',resources.app.controller.native.asset)
+
+	multiupload = multer({
+		includeEmptyFields: false,
+		putSingleFilesInArray: true,
+		dest:temp_upload_dir,
+		rename: resources.app.controller.native.asset.rename,
+		changeDest: resources.app.controller.native.asset.changeDest,
+		onParseStart: resources.app.controller.native.asset.onParseStart,
+		onParseEnd: multiupload_onParseEnd
+	});	
 
 	return {
 		multiupload: multiupload,
