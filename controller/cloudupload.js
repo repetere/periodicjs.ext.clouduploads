@@ -66,9 +66,10 @@ var uploadFileIterator = function(uploadedfile,callback){
 		clouddir;
 	clouddir = (typeof uploadedfile.clouddir==='string') ? uploadedfile.clouddir : path.join('cloudfiles',current_date);
 	uploadedfile = (typeof uploadedfile.path==='string') ? uploadedfile : uploadedfile.uploadedfileObject;
-	logger.silly('uploadFileIterator running',uploadedfile);
+	// console.log('uploadFileIterator running',uploadedfile);
 	var localuploadfile = fs.createReadStream(uploadedfile.path),
 		newfilepath = path.join(clouddir,uploadedfile.name),
+		originalFilePath = uploadedfile.path,
 		cloudupload =	cloudstorageclient.upload({
 			container: cloudStorageContainer,
 			remote: newfilepath,
@@ -106,8 +107,9 @@ var uploadFileIterator = function(uploadedfile,callback){
 		uploaded_cloud_file = extend(uploadedfile,uploaded_cloud_file);
 		// logger.silly('asyncadmin - uploaded_cloud_file',uploaded_cloud_file);
 		// cloudfiles.push(uploaded_cloud_file);
+		// console.log('trying to delete',originalFilePath);
+		deletelocalfile(originalFilePath);
 		callback(null,uploaded_cloud_file);
-		deletelocalfile(uploadedfile.path);
 	});
 	// cloudupload.on('end',function(){
 	// 	deletelocalfile(uploadedfile.path);
