@@ -62,10 +62,12 @@ var	deletelocalfile = function(filepath){
 };
 
 var uploadFileIterator = function(uploadedfile,callback){
-	logger.silly('uploadFileIterator running',uploadedfile);
 	var current_date = moment().format('YYYY/MM/DD'),
-		clouddir = path.join('cloudfiles',current_date),
-		localuploadfile = fs.createReadStream(uploadedfile.path),
+		clouddir;
+	clouddir = (typeof uploadedfile.clouddir==='string') ? uploadedfile.clouddir : path.join('cloudfiles',current_date);
+	uploadedfile = (typeof uploadedfile.path==='string') ? uploadedfile : uploadedfile.uploadedfileObject;
+	logger.silly('uploadFileIterator running',uploadedfile);
+	var localuploadfile = fs.createReadStream(uploadedfile.path),
 		newfilepath = path.join(clouddir,uploadedfile.name),
 		cloudupload =	cloudstorageclient.upload({
 			container: cloudStorageContainer,
