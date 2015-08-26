@@ -392,7 +392,9 @@ var controller = function (resources) {
 		multiupload_onParseEnd: multiupload_onParseEnd,
 		uploadFileIterator: uploadFileIterator,
 		remove: remove,
-		cloudstorageclient: cloudstorageclient
+		cloudstorageclient: function(){
+			return cloudstorageclient;
+		}
 	};
 };
 
