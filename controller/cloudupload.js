@@ -391,7 +391,8 @@ var controller = function (resources) {
 		multiupload: multiupload,
 		multiupload_onParseEnd: multiupload_onParseEnd,
 		uploadFileIterator: uploadFileIterator,
-		remove: remove
+		remove: remove,
+		cloudstorageclient: cloudstorageclient
 	};
 };
 
