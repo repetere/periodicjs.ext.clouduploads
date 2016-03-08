@@ -1,29 +1,17 @@
 {
-  "name": "periodicjs.ext.clouduploads",
-  "description": "An asset upload manager that uses pkgcloud to upload to the various cloud service providers (amazon s3, rackspace cloud files, etc)",
-  "version": "5.9.41",
-  "main": "index.js",
-  "engines": {
-    "node": ">=0.12.x"
-  },
   "author": {
-    "name": "Yaw Joseph Etse",
     "email": "yaw.etse@gmail.com",
+    "name": "Yaw Joseph Etse",
     "url": "http://about.me/yawjosephetse"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/typesettin/periodicjs.ext.clouduploads.git"
-  },
-  "scripts": {
-    "postinstall": "node install.js",
-    "postuninstall": "node uninstall.js"
+  "bugs": {
+    "url": "https://github.com/typesettin/periodicjs.ext.clouduploads/issues"
   },
   "dependencies": {
-    "@yawetse/pkgcloud": "^1.1.0",
-    "ejs": "^2.3.2",
-    "fs-extra": "^0.20.1"
+    "@yawetse/pkgcloud": "^1.2.0-alpha.0",
+    "pkgcloud": "^1.2.0-alpha.0"
   },
+  "description": "An asset upload manager that uses pkgcloud to upload to the various cloud service providers (amazon s3, rackspace cloud files, etc)",
   "devDependencies": {
     "browserify": "^10.2.4",
     "chai": "^3.0.0",
@@ -44,6 +32,11 @@
     "uglify-js": "^2.4.15",
     "uglifyify": "^3.0.1"
   },
+  "directories": {},
+  "engines": {
+    "node": ">=4.2.x"
+  },
+  "homepage": "https://github.com/typesettin/periodicjs.ext.clouduploads#readme",
   "keywords": [
     "periodicjs",
     "amazon s3",
@@ -51,8 +44,22 @@
     "uploads",
     "pkgcloud"
   ],
-  "gitHead": "da8ef47e7a9e9e5fd627feaf6f6345c1073805a4",
-  "bugs": {
-    "url": "https://github.com/typesettin/periodicjs.ext.mailer/issues"
-  }
+  "main": "index.js",
+  "maintainers": [
+    {
+      "email": "yaw.etse@gmail.com",
+      "name": "yawetse"
+    }
+  ],
+  "name": "periodicjs.ext.clouduploads",
+  "optionalDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesettin/periodicjs.ext.clouduploads.git"
+  },
+  "scripts": {
+    "postinstall": "node install.js",
+    "postuninstall": "node uninstall.js"
+  },
+  "version": "6.0.0"
 }

@@ -78,6 +78,7 @@ var uploadFileIterator = function(uploadedfile,callback){
 			cacheControl: 'public, max-age=86400',
 			'Content-Type': uploadedfile.mimetype,
 			contentType: uploadedfile.mimetype,
+			ServerSideEncryption: 'AES256',
 	    ACL: 'public-read',
 	    acl: 'public-read',
 			headers: { 

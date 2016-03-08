@@ -1,6 +1,12 @@
 {
-	"periodicCompatibility":"5.0.0",
-	"periodicDependencies": [],
+	"periodicCompatibility":"6.5.5",
+	"periodicDependencies": [
+    {
+      "extname": "periodicjs.ext.asyncadmin",
+      "version": "~7.0.0",
+      "optional": true
+    }
+  ],
 	"periodicjs.ext.admin": {
 		"menu": {
 			"Extensions": {
