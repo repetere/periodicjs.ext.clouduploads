@@ -75,7 +75,7 @@ var uploadFileIterator = function(uploadedfile,callback){
 	uploadedfile = (typeof uploadedfile.path==='string') ? uploadedfile : uploadedfile.uploadedfileObject;
 	var newfilepath = path.join(clouddir,uploadedfile.name);
 	// console.log('uploadFileIterator running',uploadedfile);
-	if(uploadedfile.attributes.encrypted_client_side){
+	if(uploadedfile.attributes && uploadedfile.attributes.encrypted_client_side){
 		newfilepath+='.enc';
 	}
 	var localuploadfile = fs.createReadStream(uploadedfile.path),
