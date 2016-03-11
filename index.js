@@ -19,6 +19,7 @@ module.exports = function (periodic) {
 	};
 	periodic.app.controller.native.asset.multiupload = periodic.app.controller.extension.cloudupload.cloudupload.multiupload;
 	periodic.app.controller.native.asset.remove = periodic.app.controller.extension.cloudupload.cloudupload.remove;
+	periodic.app.controller.native.asset.decryptAsset = periodic.app.controller.extension.cloudupload.cloudupload.decryptAsset;
 
 	return periodic;
 };

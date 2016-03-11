@@ -1,5 +1,7 @@
 'use strict';
 
+const crypto = require('crypto');
+
 var path = require('path'),
 	async = require('async'),
 	fs = require('fs-extra'),
@@ -7,6 +9,7 @@ var path = require('path'),
 	moment = require('moment'),
 	pkgcloud = require('@yawetse/pkgcloud'),
 	extend = require('util-extend'),
+	https = require('https'),
 	cloudprovider,
 	cloudproviderfilepath,
 	cloudstorageclient,
@@ -16,6 +19,10 @@ var path = require('path'),
 	CoreExtension,
 	CoreUtilities,
 	CoreController,
+	use_client_file_encryption,
+	get_client_encryption_key_string,
+	encrypt_file_chain,
+	localAssetDecrypt,
 	// multiupload_rename,
 	// multiupload_changeDest,
 	// multiupload_onParseStart,
@@ -66,9 +73,12 @@ var uploadFileIterator = function(uploadedfile,callback){
 		clouddir;
 	clouddir = (typeof uploadedfile.clouddir==='string') ? uploadedfile.clouddir : path.join('cloudfiles',current_date);
 	uploadedfile = (typeof uploadedfile.path==='string') ? uploadedfile : uploadedfile.uploadedfileObject;
+	var newfilepath = path.join(clouddir,uploadedfile.name);
 	// console.log('uploadFileIterator running',uploadedfile);
+	if(uploadedfile.attributes.encrypted_client_side){
+		newfilepath+='.enc';
+	}
 	var localuploadfile = fs.createReadStream(uploadedfile.path),
-		newfilepath = path.join(clouddir,uploadedfile.name),
 		originalFilePath = uploadedfile.path,
 		cloudupload =	cloudstorageclient.upload({
 			container: cloudStorageContainer,
@@ -102,6 +112,9 @@ var uploadFileIterator = function(uploadedfile,callback){
 		// uploaded_cloud_file.attributes.periodicPath = path.join(cloudStoragePublicPath.cdnUri,newfilepath);
 		var filelocation = (cloudprovider.provider ==='amazon') ? uploaded_cloud_file.location : cloudStoragePublicPath.cdnUri + '/' + newfilepath;
 		uploaded_cloud_file.fileurl = filelocation;
+		if(uploadedfile.attributes.encrypted_client_side){
+			uploaded_cloud_file.attributes.encrypted_client_side = uploadedfile.attributes.encrypted_client_side;
+		}
 		uploaded_cloud_file.attributes.periodicFilename = uploadedfile.name;
 		uploaded_cloud_file.attributes.cloudfilepath = newfilepath;
 		uploaded_cloud_file.attributes.cloudcontainername = cloudStorageContainer.name || cloudStorageContainer;
@@ -124,18 +137,60 @@ var uploadFileIterator = function(uploadedfile,callback){
 };
 
 var multiupload_onParseEnd = function(req,next){
-		logger.debug('req.body',req.body);
-		logger.debug('req.files',req.files);
+		// logger.debug('req.body',req.body);
+		// logger.debug('req.files',req.files);
 		var files = [],
 			current_date = moment().format('YYYY/MM/DD'),
 			clouddir = path.join('cloudfiles',current_date),
+			use_file_encryption = use_client_file_encryption({req:req}),
 			cloudfiles = [],
 			file_obj,
 			get_file_obj= function(data){
 				var returndata = data;
 				returndata.uploaddirectory = returndata.path.replace(process.cwd(),'').replace(returndata.name,'');
+				if(use_file_encryption){
+					returndata.attributes = returndata.attributes || {};
+					returndata.attributes.encrypted_client_side = true;
+					returndata.encrypted_client_side = true;
+				}
 				return returndata;
 			};
+		var process_cloud_files = function(){
+			try{
+				if(files){
+					console.log('files',files);
+					async.eachSeries(files,
+						function(uploadedfile,eachcb){
+							uploadFileIterator(uploadedfile,function(err,uploaded_cloud_file){
+								// console.log('err,uploaded_cloud_file',err,uploaded_cloud_file);
+								if(err){
+									eachcb(err);
+								}
+								else{
+									cloudfiles.push(uploaded_cloud_file);
+									eachcb();
+								}
+							});
+					},function(err){
+						if(err){
+							next(err);
+						}
+						else{
+							req.controllerData = (req.controllerData) ? req.controllerData : {};
+							req.controllerData.files = cloudfiles;
+							next();
+						}
+					});
+				}
+				else{
+					next();
+				}
+			}
+			catch(e){
+				logger.error('asyncadmin - cloudupload.multiupload',e);
+				next(e);
+			}
+		};
 		for(var x in req.files){
 			if(Array.isArray(req.files[x])){
 				for (var y in req.files[x]){
@@ -152,43 +207,24 @@ var multiupload_onParseEnd = function(req,next){
 				files.push(file_obj);
 			}
 		}
+		if(use_file_encryption){
+			async.map(
+				files,
+				encrypt_file_chain,
+				function(err,encrypted_files){
+					// console.log('encrypted_files',encrypted_files);
+					files = encrypted_files;
+					process_cloud_files();
+				});
+		}
+		else{
+			process_cloud_files();			
+		}
 		// req.controllerData = (req.controllerData) ? req.controllerData : {};
 		// req.controllerData.files = files;
 		// next();
 
-		try{
-			if(files){
-				async.eachSeries(files,
-					function(uploadedfile,eachcb){
-						uploadFileIterator(uploadedfile,function(err,uploaded_cloud_file){
-							// console.log('err,uploaded_cloud_file',err,uploaded_cloud_file);
-							if(err){
-								eachcb(err);
-							}
-							else{
-								cloudfiles.push(uploaded_cloud_file);
-								eachcb();
-							}
-						});
-				},function(err){
-					if(err){
-						next(err);
-					}
-					else{
-						req.controllerData = (req.controllerData) ? req.controllerData : {};
-						req.controllerData.files = cloudfiles;
-						next();
-					}
-				});
-			}
-			else{
-				next();
-			}
-		}
-		catch(e){
-			logger.error('asyncadmin - cloudupload.multiupload',e);
-			next(e);
-		}
+
 	};
 
 
@@ -333,6 +369,45 @@ var createStorageContainer = function () {
 	});
 };
 
+
+var decryptAsset = function(req,res){
+	req.controllerData = req.controllerData || {};
+	var asset = req.controllerData.asset;
+	if(asset.assettype==='local'){
+		// console.log('local decrypt');
+		localAssetDecrypt(req,res);
+	}
+	else{
+		// console.log('remote decrypt');
+		var encrypted_file_path = asset.fileurl;
+		res.setHeader('Content-Type', asset.assettype);
+		if(asset.size){
+			res.setHeader('Content-Length', asset.size);
+		}
+		if(!req.query.nocache || !req.body.nocache || !req.controllerData.nocache){
+			res.setHeader('Content-Control', 'public, max-age=86400');
+		}
+		https.get(encrypted_file_path, function (https_download_response) {
+			var encryption_key_password = get_client_encryption_key_string();
+			var decipher = crypto.createDecipher('aes192', encryption_key_password);
+			https_download_response.pipe(decipher).pipe(res);
+			https_download_response.on('finish', () => {
+			  logger.silly('decrypted file');
+			});
+			https_download_response.on('error',(e)=>{
+			  logger.error('error decrypting file.',e);
+				res.status(500);
+				CoreController.handleDocumentQueryErrorResponse({
+						err: e,
+						res: res,
+						req: req
+					});
+			});
+		});
+
+	}
+};
+
 /**
  * cloudupload controller
  * @module clouduploadController
@@ -363,7 +438,10 @@ var controller = function (resources) {
 	// multiupload_onParseStart = resources.app.controller.native.asset.multiupload_onParseStart;
 	upload_dir = resources.app.controller.native.asset.upload_dir;
 	temp_upload_dir = path.join(process.cwd(),upload_dir, '/tmp');
-
+	use_client_file_encryption = resources.app.controller.native.asset.use_client_file_encryption;
+	get_client_encryption_key_string = resources.app.controller.native.asset.get_client_encryption_key_string;
+	localAssetDecrypt = resources.app.controller.native.asset.decryptAsset;
+	encrypt_file_chain = resources.app.controller.native.asset.encrypt_file_chain;
 	// console.log('temp_upload_dir',temp_upload_dir);
 	// console.log('resources.app.controller.native.asset',resources.app.controller.native.asset);
 
@@ -393,6 +471,7 @@ var controller = function (resources) {
 		multiupload_onParseEnd: multiupload_onParseEnd,
 		uploadFileIterator: uploadFileIterator,
 		remove: remove,
+		decryptAsset: decryptAsset,
 		cloudstorageclient: function(){
 			return cloudstorageclient;
 		}
