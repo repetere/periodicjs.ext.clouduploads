@@ -32,6 +32,7 @@ var path = require('path'),
 	mongoose,
 	MediaAsset,
 	logger,
+	client_encryption_algo,
 	multiupload;
 
 // var multiupload_rename = function(fieldname,filename,req,res){
@@ -75,7 +76,7 @@ var uploadFileIterator = function(uploadedfile,callback){
 	uploadedfile = (typeof uploadedfile.path==='string') ? uploadedfile : uploadedfile.uploadedfileObject;
 	var newfilepath = path.join(clouddir,uploadedfile.name);
 	// console.log('uploadFileIterator running',uploadedfile);
-	if(uploadedfile.attributes && uploadedfile.attributes.encrypted_client_side){
+	if(uploadedfile.attributes.encrypted_client_side){
 		newfilepath+='.enc';
 	}
 	var localuploadfile = fs.createReadStream(uploadedfile.path),
@@ -114,6 +115,7 @@ var uploadFileIterator = function(uploadedfile,callback){
 		uploaded_cloud_file.fileurl = filelocation;
 		if(uploadedfile.attributes.encrypted_client_side){
 			uploaded_cloud_file.attributes.encrypted_client_side = uploadedfile.attributes.encrypted_client_side;
+			uploaded_cloud_file.attributes.client_encryption_algo = uploadedfile.attributes.client_encryption_algo;
 		}
 		uploaded_cloud_file.attributes.periodicFilename = uploadedfile.name;
 		uploaded_cloud_file.attributes.cloudfilepath = newfilepath;
@@ -151,6 +153,7 @@ var multiupload_onParseEnd = function(req,next){
 				if(use_file_encryption){
 					returndata.attributes = returndata.attributes || {};
 					returndata.attributes.encrypted_client_side = true;
+					returndata.attributes.client_encryption_algo = client_encryption_algo;
 					returndata.encrypted_client_side = true;
 				}
 				return returndata;
@@ -442,6 +445,7 @@ var controller = function (resources) {
 	get_client_encryption_key_string = resources.app.controller.native.asset.get_client_encryption_key_string;
 	localAssetDecrypt = resources.app.controller.native.asset.decryptAsset;
 	encrypt_file_chain = resources.app.controller.native.asset.encrypt_file_chain;
+	client_encryption_algo = resources.app.controller.native.asset.client_encryption_algo;
 	// console.log('temp_upload_dir',temp_upload_dir);
 	// console.log('resources.app.controller.native.asset',resources.app.controller.native.asset);
 
