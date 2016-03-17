@@ -76,7 +76,7 @@ var uploadFileIterator = function(uploadedfile,callback){
 	uploadedfile = (typeof uploadedfile.path==='string') ? uploadedfile : uploadedfile.uploadedfileObject;
 	var newfilepath = path.join(clouddir,uploadedfile.name);
 	// console.log('uploadFileIterator running',uploadedfile);
-	if(uploadedfile.attributes.encrypted_client_side){
+	if(uploadedfile.attributes && uploadedfile.attributes.encrypted_client_side){
 		newfilepath+='.enc';
 	}
 	var localuploadfile = fs.createReadStream(uploadedfile.path),
@@ -113,7 +113,7 @@ var uploadFileIterator = function(uploadedfile,callback){
 		// uploaded_cloud_file.attributes.periodicPath = path.join(cloudStoragePublicPath.cdnUri,newfilepath);
 		var filelocation = (cloudprovider.provider ==='amazon') ? uploaded_cloud_file.location : cloudStoragePublicPath.cdnUri + '/' + newfilepath;
 		uploaded_cloud_file.fileurl = filelocation;
-		if(uploadedfile.attributes.encrypted_client_side){
+		if(uploadedfile.attributes && uploadedfile.attributes.encrypted_client_side){
 			uploaded_cloud_file.attributes.encrypted_client_side = uploadedfile.attributes.encrypted_client_side;
 			uploaded_cloud_file.attributes.client_encryption_algo = uploadedfile.attributes.client_encryption_algo;
 		}

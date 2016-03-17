@@ -34,7 +34,7 @@
   },
   "directories": {},
   "engines": {
-    "node": ">=4.2.x"
+    "node": "~4.2.x"
   },
   "homepage": "https://github.com/typesettin/periodicjs.ext.clouduploads#readme",
   "keywords": [
@@ -61,5 +61,5 @@
     "postinstall": "node install.js",
     "postuninstall": "node uninstall.js"
   },
-  "version": "6.0.2"
+  "version": "6.0.3"
 }
