@@ -124,7 +124,9 @@ var uploadFileIterator = function(uploadedfile,callback){
 		// logger.silly('asyncadmin - uploaded_cloud_file',uploaded_cloud_file);
 		// cloudfiles.push(uploaded_cloud_file);
 		// console.log('trying to delete',originalFilePath);
-		deletelocalfile(originalFilePath);
+		if (!uploadedfile.keep_local_files) {
+			deletelocalfile(originalFilePath);
+		}
 		callback(null,uploaded_cloud_file);
 	});
 	// cloudupload.on('end',function(){
@@ -133,7 +135,9 @@ var uploadFileIterator = function(uploadedfile,callback){
 	cloudupload.on('error',function(err){
 		logger.error('asyncadmin - async each cloudupload error',err);
 		callback(err);
-		deletelocalfile(uploadedfile.path);
+		if (!uploadedfile.keep_local_files) {
+			deletelocalfile(uploadedfile.path);
+		}
 	});
 	localuploadfile.pipe(cloudupload);
 };
@@ -141,6 +145,7 @@ var uploadFileIterator = function(uploadedfile,callback){
 var multiupload_onParseEnd = function(req,next){
 		// logger.debug('req.body',req.body);
 		// logger.debug('req.files',req.files);
+		req.controllerData = req.controllerData || {};
 		var files = [],
 			current_date = moment().format('YYYY/MM/DD'),
 			clouddir = path.join('cloudfiles',current_date),
@@ -164,6 +169,10 @@ var multiupload_onParseEnd = function(req,next){
 					console.log('files',files);
 					async.eachSeries(files,
 						function(uploadedfile,eachcb){
+							if (req.body.keep_local_files || req.controllerData.keep_local_files) {
+								uploadedfile = uploadedfile || {};
+								uploadedfile.keep_local_files = true;
+							}
 							uploadFileIterator(uploadedfile,function(err,uploaded_cloud_file){
 								// console.log('err,uploaded_cloud_file',err,uploaded_cloud_file);
 								if(err){
@@ -372,6 +381,29 @@ var createStorageContainer = function () {
 	});
 };
 
+var decryptHTTPStream = function (options, cb) {
+	try {
+		https.get(options.url, function (https_download_response) {
+			var encryption_key_password = get_client_encryption_key_string();
+			var decipher = crypto.createDecipher(options.algorithm || 'aes192', encryption_key_password);
+			https_download_response.pipe(decipher).pipe(options.writeStream || options.res);
+			https_download_response.on('end', () => {
+			  cb(null, {
+			  	result: 'success',
+			  	data: {
+			  		message: 'download complete'
+			  	}
+			  });
+			});
+			https_download_response.on('error', e => {
+			  cb(e);
+			});
+		});
+	}
+	catch (e) {
+		cb(e);
+	}
+};
 
 var decryptAsset = function(req,res){
 	req.controllerData = req.controllerData || {};
@@ -390,24 +422,23 @@ var decryptAsset = function(req,res){
 		if(!req.query.nocache || !req.body.nocache || !req.controllerData.nocache){
 			res.setHeader('Content-Control', 'public, max-age=86400');
 		}
-		https.get(encrypted_file_path, function (https_download_response) {
-			var encryption_key_password = get_client_encryption_key_string();
-			var decipher = crypto.createDecipher('aes192', encryption_key_password);
-			https_download_response.pipe(decipher).pipe(res);
-			https_download_response.on('finish', () => {
-			  logger.silly('decrypted file');
-			});
-			https_download_response.on('error',(e)=>{
-			  logger.error('error decrypting file.',e);
+		decryptHTTPStream({
+			res: res,
+			url: encrypted_file_path
+		}, function (err) {
+			if (err) {
+				logger.error('error decrypting file.', err);
 				res.status(500);
 				CoreController.handleDocumentQueryErrorResponse({
-						err: e,
-						res: res,
-						req: req
-					});
-			});
+					err: err,
+					res: res,
+					req: req
+				});
+			}
+			else {
+				logger.silly('decrypted file');
+			}
 		});
-
 	}
 };
 
@@ -476,6 +507,7 @@ var controller = function (resources) {
 		uploadFileIterator: uploadFileIterator,
 		remove: remove,
 		decryptAsset: decryptAsset,
+		decryptHTTPStream: decryptHTTPStream,
 		cloudstorageclient: function(){
 			return cloudstorageclient;
 		}
