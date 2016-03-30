@@ -145,6 +145,7 @@ var uploadFileIterator = function(uploadedfile,callback){
 var multiupload_onParseEnd = function(req,next){
 		// logger.debug('req.body',req.body);
 		// logger.debug('req.files',req.files);
+		req.controllerData = req.controllerData || {};
 		var files = [],
 			current_date = moment().format('YYYY/MM/DD'),
 			clouddir = path.join('cloudfiles',current_date),
